@@ -1,0 +1,188 @@
+#xodigo a partir de 22
+
+
+%pip install -q selenium
+%pip install -q tabulate
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+from PIL import Image
+from IPython.display import display
+from google.colab import files
+import requests
+from selenium.webdriver.support.ui import Select
+from tabulate import tabulate
+import pandas as pd
+
+
+# Configure Chrome options for headless mode
+chrome_options = Options()
+chrome_options.add_argument("--headless")
+chrome_options.add_argument("--no-sandbox")
+chrome_options.add_argument("--disable-dev-shm-usage")
+# Initialize the WebDriver (e.g., Chrome) with the configured options
+driver = webdriver.Chrome(options=chrome_options)
+#wait = WebDriverWait(driver, timeout=2)
+#wait.until(lambda _ : revealed.is_displayed())
+
+
+
+# Navigate to the webpage containing the div-based table
+url="https://opcoes.net.br/opcoes/bovespa/PETR4"
+driver.get(url) # Replace with the actual URL
+response = requests.get(url)
+text_content = response.text
+# Wait for the table element to be present (adjust locator as needed)
+# This assumes the main table div has a specific class, e.g., 'table-container'
+url_list = url.split('/')
+print("papel:  "+url_list[len(url_list)-1])
+print("\n")
+table=driver.find_element(By.ID,"divMinMax")
+print("valores maximos")
+print(table.text)
+print("\n")
+print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+table2=driver.find_element(By.ID,"divCotacaoAtual")
+print("cotacao atual")
+print(table2.text)
+cotiz = table2.text
+cotiz_list = cotiz.split(' ')
+print(cotiz_list)
+val_mom=cotiz_list[1]
+val_mom=float(val_mom.replace(",","."))
+print("val no momento  ",val_mom)
+print("\n")
+print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+vencimentos = driver.find_element(By.ID, "grade-vencimentos-dates")
+print("grade tipo")
+print(vencimentos.text)
+ids = driver.find_elements(By.TAG_NAME,"input")
+vencimentos=[]
+datas=[]
+for ii in ids:
+    #print ii.tag_name
+    #print (ii.get_attribute('id'))    # id name as string
+    datas.append(ii.get_attribute('id'))
+    vencimentos.append(ii.get_attribute('selected'))
+
+print(datas[0:3])
+print(vencimentos[0:3])
+print(datas[3:])
+print(vencimentos[3:])
+print("\n")
+table2=driver.find_element(By.ID,"strike-range")
+print("range strike")
+print(table2.text)
+print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+print("\n")
+print("tabla entera busca titulos")
+# Wait for the table to be loaded
+wait = WebDriverWait(driver, 10)
+table_container = wait.until(EC.presence_of_element_located((By.ID, "tblListaOpc_wrapper")))
+table_data = []
+#Message: stale element reference: stale element not found in the current frame
+header=[]
+rows = table_container.find_elements(By.TAG_NAME, "tr")
+for row in rows:
+  row_data = []
+  headers = row.find_elements(By.TAG_NAME, "th") # Or "th" for header cells
+  for cell in headers:
+    #print(cell.text)
+    header.append(cell.text) # Get the visible text of the cell
+  #table_data.append(row_data)
+
+half=int(0.5*len(header))
+del header[int(header.index('')):(half)]
+header1=header[0:int(header.index('Núm. de Neg.'))]
+naodee=["Vol. Financeiro","Vol. Impl. (%)","Delta","Gamma", "Theta ($)", "Theta (%)","Vega",	"IQ","Coberto","Travado","Descob.","Tit.","Lanç."]
+header2=header1+naodee
+#<th class="dt-body-right dt-type-numeric dt-orderable-asc dt-orderable-desc" data-dt-column="2" rowspan="2" colspan="1"><span class="dt-column-title">Dias úteis</span><span class="dt-column-order" role="button" aria-label="Dias úteis: Activate to sort" tabindex="0"></span></th>
+print("\n")
+print("===============================================")
+print("     datos ")
+table_data.append(header2)
+# Re-find rows inside the loop to avoid StaleElementReferenceException
+rows = table_container.find_elements(By.TAG_NAME, "tr")
+for row in rows:
+  row_data = []
+  xont=0
+  cells = row.find_elements(By.TAG_NAME, "td") # Or "th" for header cells
+  for cell in cells:
+    if len(cell.text)>0:
+      row_data.append(cell.text) # Get the visible text of the cell
+    xont=xont+1
+  table_data.append(row_data)
+
+#print(xont)
+table_data= [0 if item == "" or item is None else item for item in table_data]
+print("\n")
+print("***********************************************")
+print('table')
+print("***********************************************")
+# 24 vlores offline
+#StaleElementReferenceException: Message: stale element reference: stale element not found in the current frame
+#(Valor de Strike - Valor da ação no momento) +
+#(preço de venda da call no strike - preço de compra da put no strike)/( Valor da ação no momento + preço de compra da put no strike)
+filtered_list = list(filter(None, table_data)) # None acts as a filter for "falsy" values
+print(tabulate(filtered_list))
+datas=filtered_list
+print("nuevo datas ",len(datas))
+for i in range(int(len(datas)-1)):
+    if i % 2 == 0:
+      print("verif 1  ",len(datas[i+1]))
+      print("verif 2  ",len(datas[i+2]))
+      if (len(datas[i+1]))< 36:
+        for s in range(36-len(datas[i+1])):
+          datas[i+1].append("0.0")
+    
+      if (len(datas[i+2]))< 36:
+        for s in range(36-len(datas[i+2])):
+          datas[i+2].append("0.0")
+
+      print("indixe  ",i)
+      if (len(datas[i+1]))>23:
+        #3 for offline 4 for realtime
+        print("dados real time")
+        strike=(datas[i+1][4])
+      else:
+        print("dados offline")
+        strike=(datas[i+1][3])
+      
+      print("verif 3  ",len(datas[i+1]))
+      print("verif 4  ",len(datas[i+2]))
+      bid=(datas[i+1][11])
+      ask=(datas[i+2][12]) 
+      strike = strike.replace(".", " ")
+      bid=bid.replace(".", "")
+      ask=ask.replace(".", "")
+      strike = strike.replace(",",".")
+      if strike.isnumeric():
+        float(strike)
+        #linha 163
+      else: 
+          strike=0.0
+        
+        
+      bid=(bid.replace(",", "."))
+      ask=(ask.replace(",", "."))
+      print(type(strike), strike)
+      print(type(bid), bid)
+      print(type(ask), ask)
+      print('fatores formula')
+      bid=float(bid)
+      ask=float(ask)
+      print((datas[i+1][0]),"  ",val_mom,strike,bid,ask)
+      #(Valor de Strike - Valor da ação no momento) +
+      #(preço de venda da call no strike - preço de compra da put no strike)/( Valor da ação no momento + preço de compra da put no strike)
+      formula=(strike-val_mom)+(bid-ask)/(val_mom+ask)
+      print(formula)
+      print("=================================================")
+      print(" ")
+      (datas[i+1].append(formula))
+      (datas[i+2].append(formula))
+
+print(tabulate(datas))
+
+

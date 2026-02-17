@@ -1,0 +1,393 @@
+#xodigo a partir de 22
+
+%pip install -q selenium
+%pip install -q tabulate
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+from PIL import Image
+from IPython.display import display
+from google.colab import files
+import requests
+from selenium.webdriver.support.ui import Select
+from tabulate import tabulate
+import pandas as pd
+#from google.colab import drive drive.mount('/content/drive') ##you will need to authenticate using an authorization code. Content/ drive is the default folder.
+from google.colab import files
+from google.colab import drive
+
+
+# Configure Chrome options for headless mode
+chrome_options = Options()
+chrome_options.add_argument("--headless")
+chrome_options.add_argument("--no-sandbox")
+chrome_options.add_argument("--disable-dev-shm-usage")
+# Initialize the WebDriver (e.g., Chrome) with the configured options
+driver = webdriver.Chrome(options=chrome_options)
+#wait = WebDriverWait(driver, timeout=2)
+#wait.until(lambda _ : revealed.is_displayed())
+
+def ajuste(url2,tiker,val_mom,strike,bid,ask):
+      #print("strike ajuste ",type(strike),"len ",len(strike), strike)
+      #print("bid ajuste    ",type(bid), "len ", len(bid), bid)
+      #print("ask ajuste    ",type(ask), "len  ", len(ask),ask)
+      #print("val_mom    ",type(val_mom), "len  ", (val_mom),val_mom)
+      #strike = strike.replace(".", "
+      # if bid.isnumeric():
+      #   float(bid)
+      # else:
+      #     float(bid)
+      #     #bid=0.0
+      # if ask.isnumeric():
+      #   float(ask)
+      # else:
+      #     float(ask)
+      #     #ask=0.0
+      #print("strike v2 ",type(strike),"len ",len(strike), strike)
+      #print("bid v2    ",type(bid), "len ", len(bid), bid)
+      #print("ask v2    ",type(ask), "len  ", len(ask),ask)
+      #print('fatores formula')
+      #bid=float(bid)
+      #ask=float(ask)
+      #(Valor de Strike - Valor da ação no momento) +
+      #(preço de venda da call no strike - preço de compra da put no strike)/( Valor da ação no momento + preço de compra da put no strike)
+      formula=(float(strike)-float(val_mom))+(float(bid)-float(ask))/(float(val_mom)+float(ask))
+      #print(" ativo   ticker     val mom    strike      bid      ask    formula  (ajuste)")
+      #print("formula   ",formula)
+      #print(url2,"  ",tiker,"  ",val_mom,strike,bid,ask,formula)
+      #print(formula)
+      print("=================================================")
+      print(" ")
+      return formula
+      #(datas[i].append(formula))
+      #(datas[i+1].append(formula))
+      #(datas[i].append(url_list[len(url_list)-1]))
+      #(datas[i+1].append(url_list[len(url_list)-1]))
+      #linha 231
+
+def armazem(df):
+  temporaldf=df
+  # Save to CSV
+  temporaldf.to_csv('output.csv')
+  #temporal.to_csv(r'/media/jjss/info//output.csv', index=False)
+  #temporaldf.to_excel('/content/drive/My Drive/folder to save/merged_data.xlsx', index=False, sheet_name='summary');
+  #temporaldf.download('output.csv')
+  #drive.mount('/content/drive')
+  temporaldf.to_csv("my_data.csv")
+  #temporaldf.to_xls("my_data.xls")
+  temporaldf.to_excel("my_data.xlsx")
+  files.download("my_data.csv")
+  files.download("my_data.xlsx")
+  return temporaldf
+
+def cadeiastring(i,datascall,datasput):
+        #print("indixe  ",i)
+        #print(datascall)
+        #print(datasput)
+        if (len(datascall))>26:
+          #3 for offline 4 for realtime
+          #print("dados real time")
+          strike=(datascall[4])
+        else:
+          print("dados offline")
+          strike=(datascall[3])
+
+        #print("verif 3  ",len(datascall))
+        #print("verif 4  ",len(datasput))
+        bid=(datascall[11])
+        ask=(datasput[12])
+        if len(bid)<1:
+          bid="0.0"
+          #print("empty bid xell  ",bid)
+
+        if len(ask)<1:
+          ask="0.0"
+          #print("empty ask xell  ",ask)
+
+        strike = strike.replace(".", " ")
+        bid=bid.replace(".", "")
+        ask=ask.replace(".", "")
+        strike = strike.replace(",",".")
+        #print("strikev1  ",len(strike)," ",type(strike), strike)
+        if strike.isnumeric():
+          float(strike)
+          #linha 163
+        else:
+          float(strike)
+          #strike=0.0
+
+        bid=(bid.replace(",", "."))
+        ask=(ask.replace(",", "."))
+        #print("bidv1     ",len(bid),"  ",type(bid), bid)
+       # print("askv1     ",len(ask),"  ",type(ask), ask)
+       # print("strikev1  ",len(strike)," ",type(strike), strike)
+        if bid.isnumeric():
+          float(bid)
+        else:
+          float(bid)
+
+
+        float(bid)
+        float(ask)
+        float(strike)
+        #bid=0.0
+        #ask=0.0
+        #print("bid cadeiastringv2     ",len(bid),"  ",type(bid), bid)
+        #print("ask cadeiastring2     ",len(ask),"  ",type(ask), ask)
+        #print("strike cadeiastringv2  ",len(strike)," ",type(strike), strike)
+        return strike,bid,ask
+
+
+def extrax(table_container):
+    #Message: stale element reference: stale element not found in the current frame
+    header=[]
+    rows = table_container.find_elements(By.TAG_NAME, "tr")
+    for row in rows:
+      row_data = []
+      #linha 90
+      headers = row.find_elements(By.TAG_NAME, "th") # Or "th" for header cells
+      for cell in headers:
+        #print(cell.text)
+        header.append(cell.text) # Get the visible text of the cell
+        #table_data.append(row_data)
+
+    #print("sub extrax   ",header)
+    return header
+
+def headerajust(quantcolumns,header):
+    half=int(0.5*len(header))
+    #del header[int(header.index('')):(half)]
+    #print(header)
+    header1=header[0:int(header.index('Núm. de Neg.'))]
+    naodee=["Vol. Financeiro","Vol. Impl. (%)","Delta","Gamma", "Theta ($)", "Theta (%)","Vega",    "IQ","Coberto","Travado","Descob.","Tit.","Lanç."]
+    header2=header1+naodee
+    headerlen=(quantcolumns)-len(header2)
+    for i in range (headerlen):
+      headerext="extra column "
+      header2.append(headerext)
+
+
+    #print("header sub  ",header2)
+    return header2
+
+
+def extradados(table_container):
+    table_data=[]
+    #print("start linha 137   ",table_data)
+    #<th class="dt-body-right dt-type-numeric dt-orderable-asc dt-orderable-desc" data-dt-column="2" rowspan="2" colspan="1"><span class="dt-column-title">Dias úteis</span><span class="dt-column-order" role="button" aria-label="Dias úteis: Activate to sort" tabindex="0"></span></th>
+    print("\n")
+    print("===============================================")
+    #print("     datos ")
+    # table_data.append(header2) # Removed adding header to table_data
+    # Re-find rows inside the loop to avoid StaleElementReferenceException
+    rows = table_container.find_elements(By.TAG_NAME, "tr")
+    #row_data = []
+    #print("rows   ",rows)
+    for row in rows:
+      row_data = []
+      xont=0
+      cells = row.find_elements(By.TAG_NAME, "td") # Or "th" for header cells
+      for cell in cells:
+        row_data.append(cell.text) # Get the visible text of the cell
+        #print(cell.text)
+        #print("row data  ",row_data)
+
+      table_data.append(row_data)
+    return table_data
+
+
+
+def prinp(url2):
+    #url2="AMBP3"
+    print(" dado de entrada en iteraxion ",url2)
+    strike=0
+    bid=0
+    ask=0
+    resumo_list = [] # Initialize an empty list to store dictionaries
+    # Navigate to the webpage containing the div-based table
+    url="https://opcoes.net.br/opcoes/bovespa/"+url2
+    quantcolumns=36
+    driver.get(url) # Replace with the actual URL
+    response = requests.get(url)
+    text_content = response.text
+    # Wait for the table element to be present (adjust locator as needed)
+    # This assumes the main table div has a specific class, e.g., 'table-container'
+    url_list = url.split('/')
+    print("papel:  "+url_list[len(url_list)-1])
+    print("\n")
+    table=driver.find_element(By.ID,"divMinMax")
+    print("valores maximos")
+    print(table.text)
+    print("\n")
+    print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+    table2=driver.find_element(By.ID,"divCotacaoAtual")
+    print("cotacao atual")
+    print(table2.text)
+    cotiz = table2.text
+    cotiz_list = cotiz.split(' ')
+    print(cotiz_list)
+    val_mom=cotiz_list[1]
+    val_mom=val_mom.replace("."," ")
+    val_mom=float(val_mom.replace(",","."))
+    print("val no momento  ",val_mom)
+    print("\n")
+    print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+    vencimentos = driver.find_element(By.ID, "grade-vencimentos-dates")
+    print("grade tipo")
+    print(vencimentos.text)
+    ids = driver.find_elements(By.TAG_NAME,"input")
+    vencimentos=[]
+    datas=[]
+    for ii in ids:
+        #print ii.tag_name
+        #print (ii.get_attribute('id'))    # id name as string
+        datas.append(ii.get_attribute('id'))
+        vencimentos.append(ii.get_attribute('selected'))
+
+    print(datas[0:3])
+    print(vencimentos[0:3])
+    print(datas[3:])
+    print(vencimentos[3:])
+    print("\n")
+    table2=driver.find_element(By.ID,"strike-range")
+    print("range strike")
+    print(table2.text)
+    print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+    print("\n")
+    #print("tabla entera busca titulos")
+    # Wait for the table to be loaded
+    #driver.refresh()
+    wait = WebDriverWait(driver, 5000)
+    table_container = wait.until(EC.presence_of_element_located((By.ID, "tblListaOpc_wrapper")))
+    #header=extrax(table_container)
+    #headers=headerajust(quantcolumns,header)
+    table_data=extradados(table_container)
+    #print(xont)
+    #print("headers extra  ", headers)
+    #print(tabulate(table_data, headers=headers, tablefmt="grid"))
+    table_data= ["0.0" if item == " " or item is None else item for item in table_data]
+    print("\n")
+    print("***********************************************")
+    #print('table')
+    #print("***********************************************")
+    # 24 vlores offline
+    #StaleElementReferenceException: Message: stale element reference: stale element not found in the current frame
+    #(Valor de Strike - Valor da ação no momento) +
+    #(preço de venda da call no strike - preço de compra da put no strike)/( Valor da ação no momento + preço de compra da put no strike)
+    filtered_list = list(filter(None, table_data)) # None acts as a filter for "falsy" values
+    #print(tabulate(filtered_list, headers=headers, tablefmt="grid"))
+    datas=filtered_list
+    i=0
+    #print("nuevo datas ",len(datas))
+    for i in range(0,int(len(datas)),2): # Adjusted loop range
+        if i % 2 == 0:
+          #print("verif 1  ",len(datas[i+1]))
+          #print("verif 2  ",len(datas[i+2]))
+          if (len(datas[i]))< quantcolumns:
+             #print(len(datas[i]))
+             for s in range(36-len(datas[i])):
+              datas[i].append("0.0")
+              #print("numeral   ",i," dato  ",datas[i])
+
+          if (len(datas[i+1]))< quantcolumns:
+            #print(len(datas[i+1]))
+            for s in range(36-len(datas[i+1])):
+              datas[i+1].append("0.0")
+              #print("numeral   ",i," dato  ",datas[i+1])
+
+
+        #print("antes de erro ",i)
+        [strike, bid, ask]=cadeiastring(i,datas[i],datas[i+1])
+        #print("valores antes de ajuste  ",val_mom,strike,bid,ask)
+        formula=ajuste(url2,datas[i][0],val_mom,strike,bid,ask)
+        (datas[i].append(formula))
+        (datas[i+1].append(formula))
+        (datas[i].append(url2))
+        (datas[i+1].append(url2))
+        # Append a dictionary for each row to the list
+        resumo_list.append({
+            'Ativo': url2,
+            'ticker': datas[i][0],
+            'val mom': val_mom,
+            'strike': strike,
+            'bid': bid,
+            'ask': ask,
+            'formula': formula
+        })
+
+
+    #print(tabulate(datas))
+    #print(tabulate(datas, headers=header2, tablefmt="grid")) # Use header2 for tabulate
+    #print("headers off  ",len(headers))
+    #print(headers)
+    print(" tipo variable  ",type(resumo_list))
+    print(resumo_list)
+    headers=["tixker","tipo","FM","mod","strike","a/i/otm","dist strike","teorixo","vi",
+             "qtd bid","vol imp bid","bid","ask","vol imp ask",
+             "qtd ask","ultimo",
+             "var ","data/hora","ve","premio strike","premio xot","num de neg",
+             "Vol. Financeiro","Vol. Impl. (%)","Delta","Gamma", "Theta ($)", "Theta (%)","Vega", "prob itm",   "IQ",
+             "Coberto","Travado","Descob.","Tit.","Lanç."]
+    headers2=headers+["  formula  ","Ativo"]
+    df = pd.DataFrame(datas[0:], columns=headers2) # Create DataFrame from data rows and use header2 as columns
+    # Create df2 from the list of dictionaries after the loop
+    df2 = pd.DataFrame(resumo_list)
+    print(df2)
+
+    ativo_column = df.pop("Ativo") # Use the correct column name with leading spaces
+    df.insert(0, "Ativo", ativo_column)
+    #print(df)
+    #print(df2)
+    #print(tabulate(df))
+    #armazem(df)
+    return df2
+
+#prinp(url2)
+
+def get_sel(driver):
+  dfres=[]
+  select_element = driver.find_element(By.NAME, "IdAcao")
+  # 2. Create a Select object
+  select = Select(select_element)
+  # 3. Get all available options (WebElements)
+  all_options = select.options
+  # 4. Iterate through the options and extract their text or value attributes
+  print("Visible text of all options:")
+  # Get the list of option texts before iterating
+  option_texts = [option.text for option in all_options if len(option.text) > 1]
+  # Use a list to store the dataframes from each call to prinp
+  all_dataframes = pd.DataFrame()
+  for option_text in option_texts:
+      print("\n")
+      print("option linha 340  inside get_sel ",option_text)
+      print("https://opcoes.net.br/opcoes/bovespa/"+option_text)
+      # Call prinp and append the returned dataframe to the list
+      df1 = prinp(option_text)
+      combined_df = pd.concat([all_dataframes, df1], axis=0, ignore_index=True)
+
+  print(combined_df)
+  return df1
+  
+
+#print("\nValue attribute of all options:")
+#for option in all_options:
+    #print(option.get_attribute("value"))
+
+
+# Navigate to the webpage containing the div-based table
+url="https://opcoes.net.br/opcoes/bovespa/AURE3"
+driver.get(url) # Replace with the actual URL
+response = requests.get(url)
+text_content = response.text
+# Wait for the table element to be present (adjust locator as needed)
+# This assumes the main table div has a specific class, e.g., 'table-container'
+url_list = url.split('/')
+print("papel:  "+url_list[len(url_list)-1])
+print("\n")
+#<select name="IdAcao"><option></option>value
+get_sel(driver)
+
+# Close the browser
+driver.quit()

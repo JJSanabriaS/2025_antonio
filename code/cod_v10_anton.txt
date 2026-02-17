@@ -1,0 +1,168 @@
+%pip install -q selenium
+%pip install -q tabulate
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+from PIL import Image
+from IPython.display import display
+from google.colab import files
+import requests
+from selenium.webdriver.support.ui import Select
+from tabulate import tabulate
+
+
+# Configure Chrome options for headless mode
+chrome_options = Options()
+chrome_options.add_argument("--headless")
+chrome_options.add_argument("--no-sandbox")
+chrome_options.add_argument("--disable-dev-shm-usage")
+# Initialize the WebDriver (e.g., Chrome) with the configured options
+driver = webdriver.Chrome(options=chrome_options)
+#wait = WebDriverWait(driver, timeout=2)
+#wait.until(lambda _ : revealed.is_displayed())
+
+# Navigate to the webpage containing the div-based table
+url="https://opcoes.net.br/opcoes/bovespa/VALE3"
+
+driver.get(url) # Replace with the actual URL
+response = requests.get(url)
+text_content = response.text
+#print(text_content)
+
+# Wait for the table element to be present (adjust locator as needed)
+# This assumes the main table div has a specific class, e.g., 'table-container'
+url_list = url.split('/')
+#print(len(url_list))
+#print(url_list)
+print("papel:  "+url_list[len(url_list)-1])
+
+
+print("\n")
+table=driver.find_element(By.ID,"divMinMax")
+print("valores maximos")
+print(table.text)
+print("\n")
+print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+table2=driver.find_element(By.ID,"divCotacaoAtual")
+print("cotacao atual")
+print(table2.text)
+cotiz = table2.text
+cotiz_list = cotiz.split(' ')
+print(cotiz_list)
+#print(cotiz_list[1])
+Val_no_mom=cotiz_list[1]
+print("val no momento  ",Val_no_mom)
+print("\n")
+print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+
+vencimentos = driver.find_element(By.ID, "grade-vencimentos-dates")
+print("grade tipo")
+print(vencimentos.text)
+ids = driver.find_elements(By.TAG_NAME,"input")
+vencimentos=[]
+datas=[]
+for ii in ids:
+    #print ii.tag_name
+    #print (ii.get_attribute('id'))    # id name as string
+    datas.append(ii.get_attribute('id'))
+    vencimentos.append(ii.get_attribute('selected'))
+
+#print(datas)
+#print(vencimentos)
+
+
+print(datas[0:3])
+print(vencimentos[0:3])
+print(datas[3:])
+print(vencimentos[3:])
+print("\n")
+
+
+table2=driver.find_element(By.ID,"strike-range")
+print("range strike")
+print(table2.text)
+print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+print("\n")
+#table3=driver.find_element(By.ID,"tblListaOpc_wrapper")
+#table3=driver.find_element(By.CLASS_NAME,"dt-column-title")
+
+#<table class="compact stripe hover dtfc-has-start dtfc-has-left dataTable dtfc-scrolling-end dtfc-scrolling-right" 
+#aria-describedby="tblListaOpc_info" style="margin-left: 0px; width: 1695.95px;"><thead>
+#<tr><th data-dt-column="0" rowspan="2" colspan="1" class="dt-orderable-asc dt-orderable-desc dtfc-fixed-start dtfc-fixed-left" 
+#style="position: sticky; left: 0px;"><span class="dt-column-title">Ticker&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+#</span><span class="dt-column-order" role="button" aria-label="Ticker&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;: Activate to sort" tabindex="0"></span></th><th class="dt-body-center dt-orderable-asc dt-orderable-desc" data-dt-column="1" rowspan="2" colspan="1"><span class="dt-column-title">Tipo</span><span class="dt-column-order" role="button" aria-label="Tipo: Activate to sort" tabindex="0"></span></th><th class="dt-body-center dt-orderable-asc dt-orderable-desc" data-dt-column="2" rowspan="1" colspan="1" title="Indica se a série possui formador de mercado, ou seja, se há agentes responsáveis por assegurar liquidez ao ativo"><span class="dt-column-title">F.M.&nbsp;</span><span class="dt-column-order" role="button" aria-label="F.M.&amp;nbsp;: Activate to sort" tabindex="0"></span></th><th class="dt-body-center dt-orderable-asc dt-orderable-desc" data-dt-column="3" rowspan="1" colspan="1" title="Indica se é uma opção do estilo |A|mericana ou |E|uropeia"><span class="dt-column-title">Mod.</span><span class="dt-column-order" role="button" aria-label="Mod.: Activate to sort" tabindex="0"></span></th><th class="dt-body-right dt-orderable-asc dt-orderable-desc" data-dt-column="4" rowspan="1" colspan="1"><span class="dt-column-title">Strike&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="dt-column-order" role="button" aria-label="Strike&amp;nbsp;&amp;nbsp;&amp;nbsp;&amp;nbsp;: Activate to sort" tabindex="0"></span></th><th class="dt-body-center text-nowrap dt-orderable-asc dt-orderable-desc" data-dt-column="5" rowspan="1" colspan="1"><span class="dt-column-title">A/I/OTM</span><span class="dt-column-order" role="button" aria-label="A/I/OTM: Activate to sort" tabindex="0"></span></th><th class="dt-body-center dt-orderable-asc dt-orderable-desc" data-dt-column="6" rowspan="2" colspan="1" title="Distância percentual do strike para a última cotação"><span class="dt-column-title">Dist. (%) do Strike</span><span class="dt-column-order" role="button" aria-label="Dist. (%) do Strike: Activate to sort" tabindex="0"></span></th><th class="dt-body-right dt-orderable-asc dt-orderable-desc" data-dt-column="7" rowspan="2" colspan="1"><span class="dt-column-title">Último</span><span class="dt-column-order" role="button" aria-label="Último: Activate to sort" tabindex="0"></span></th><th class="dt-body-right dt-orderable-asc dt-orderable-desc" data-dt-column="8" rowspan="2" colspan="1" title="Variação percentual"><span class="dt-column-title">Var.&nbsp;(%)</span><span class="dt-column-order" role="button" aria-label="Var.&amp;nbsp;(%): Activate to sort" tabindex="0"></span></th><th class="dt-body-center text-nowrap dt-orderable-asc dt-orderable-desc" data-dt-column="9" rowspan="2" colspan="1"><span class="dt-column-title">Data/Hora</span><span class="dt-column-order" role="button" aria-label="Data/Hora: Activate to sort" tabindex="0"></span></th><th class="dt-body-right dt-orderable-asc dt-orderable-desc" data-dt-column="10" rowspan="2" colspan="1" title="Número de negócios"><span class="dt-column-title">Núm. de Neg.</span><span class="dt-column-order" role="button" aria-label="Núm. de Neg.: Activate to sort" tabindex="0"></span></th><th class="dt-body-right dt-orderable-asc dt-orderable-desc dt-ordering-desc" data-dt-column="11" rowspan="2" colspan="1" title="Volume Financeiro (R$)" aria-sort="descending"><span class="dt-column-title">Vol. Financeiro</span><span class="dt-column-order" role="button" aria-label="Vol. Financeiro: Activate to remove sorting" tabindex="0"></span></th><th class="dt-body-right dt-orderable-asc dt-orderable-desc" data-dt-column="12" rowspan="2" colspan="1" title="Volatilidade implícita"><span class="dt-column-title">Vol. Impl. (%)</span><span class="dt-column-order" role="button" aria-label="Vol. Impl. (%): Activate to sort" tabindex="0"></span></th><th class="dt-body-right dt-orderable-asc dt-orderable-desc" data-dt-column="13" rowspan="2" colspan="1"><span class="dt-column-title">Delta</span><span class="dt-column-order" role="button" aria-label="Delta: Activate to sort" tabindex="0"></span></th><th class="dt-body-right dt-orderable-asc dt-orderable-desc" data-dt-column="14" rowspan="2" colspan="1"><span class="dt-column-title">Gamma</span><span class="dt-column-order" role="button" aria-label="Gamma: Activate to sort" tabindex="0"></span></th><th class="dt-body-right dt-orderable-asc dt-orderable-desc" data-dt-column="15" rowspan="2" colspan="1"><span class="dt-column-title">Theta ($)</span><span class="dt-column-order" role="button" aria-label="Theta ($): Activate to sort" tabindex="0"></span></th><th class="dt-body-right dt-orderable-asc dt-orderable-desc" data-dt-column="16" rowspan="2" colspan="1"><span class="dt-column-title">Theta (%)</span><span class="dt-column-order" role="button" aria-label="Theta (%): Activate to sort" tabindex="0"></span></th><th class="dt-body-right dt-orderable-asc dt-orderable-desc" data-dt-column="17" rowspan="2" colspan="1"><span class="dt-column-title">Vega</span><span class="dt-column-order" role="button" aria-label="Vega: Activate to sort" tabindex="0"></span></th><th class="dt-body-right dt-orderable-asc dt-orderable-desc" data-dt-column="18" rowspan="2" colspan="1" title="IQ = Titulares / lançadores"><span class="dt-column-title">IQ</span><span class="dt-column-order" role="button" aria-label="IQ: Activate to sort" tabindex="0"></span></th><th class="dt-body-right dt-orderable-asc dt-orderable-desc" data-dt-column="19" rowspan="2" colspan="1" title="Coberto"><span class="dt-column-title">Coberto</span><span class="dt-column-order" role="button" aria-label="Coberto: Activate to sort" tabindex="0"></span></th><th class="dt-body-right dt-orderable-asc dt-orderable-desc" data-dt-column="20" rowspan="2" colspan="1" title="Travado"><span class="dt-column-title">Travado</span><span class="dt-column-order" role="button" aria-label="Travado: Activate to sort" tabindex="0"></span></th><th class="dt-body-right dt-orderable-asc dt-orderable-desc" data-dt-column="21" rowspan="2" colspan="1" title="Descoberto"><span class="dt-column-title">Descob.</span><span class="dt-column-order" role="button" aria-label="Descob.: Activate to sort" tabindex="0"></span></th><th class="dt-body-right dt-orderable-asc dt-orderable-desc" data-dt-column="22" rowspan="2" colspan="1" title="Titulares"><span class="dt-column-title">Tit.</span><span class="dt-column-order" role="button" aria-label="Tit.: Activate to sort" tabindex="0"></span></th><th class="dt-body-right dt-orderable-asc dt-orderable-desc" data-dt-column="23" rowspan="2" colspan="1" title="Lançadores"><span class="dt-column-title">Lanç.</span><span class="dt-column-order" role="button" aria-label="Lanç.: Activate to sort" tabindex="0"></span></th></tr><tr role="row"><th><select data-dtcolindex="2"><option value=""></option><option value="✔">✔</option></select></th><th><select data-dtcolindex="3"><option value=""></option><option value="A">A</option><option value="E">E</option></select></th><th><select data-dtcolindex="4"><option value=""></option><option value="57,32">57,32</option><option value="57,82">57,82</option><option value="58,32">58,32</option><option value="58,82">58,82</option><option value="59,32">59,32</option><option value="59,82">59,82</option><option value="60,32">60,32</option><option value="60,82">60,82</option><option value="61,32">61,32</option><option value="61,82">61,82</option></select></th><th><select data-dtcolindex="5"><option value=""></option><option value="ATM">ATM</option><option value="ITM">ITM</option><option value="OTM">OTM</option></select></th></tr></thead><colgroup><col data-dt-column="0" style="width: 104.483px; min-width: 104.483px;"><col data-dt-column="1" style="width: 57.4667px; min-width: 57.4667px;"><col data-dt-column="2" style="width: 59.6333px; min-width: 59.6333px;"><col data-dt-column="3" style="width: 60.35px; min-width: 60.35px;"><col data-dt-column="4" style="width: 80.6px; min-width: 80.6px;"><col data-dt-column="5" style="width: 79.1333px; min-width: 79.1333px;"><col data-dt-column="6" style="width: 66.1333px; min-width: 66.1333px;"><col data-dt-column="7" style="width: 70.45px; min-width: 70.45px;"><col data-dt-column="8" style="width: 78.4px; min-width: 78.4px;"><col data-dt-column="9" style="width: 91.4167px; min-width: 91.4167px;"><col data-dt-column="10" style="width: 62.5px; min-width: 62.5px;"><col data-dt-column="11" style="width: 95.7833px; min-width: 95.7833px;"><col data-dt-column="12" style="width: 60.35px; min-width: 60.35px;"><col data-dt-column="13" style="width: 61.8px; min-width: 61.8px;"><col data-dt-column="14" style="width: 77.6833px; min-width: 77.6833px;"><col data-dt-column="15" style="width: 64.7px; min-width: 64.7px;"><col data-dt-column="16" style="width: 64.7px; min-width: 64.7px;"><col data-dt-column="17" style="width: 61.0833px; min-width: 61.0833px;"><col data-dt-column="18" style="width: 43.7333px; min-width: 43.7333px;"><col data-dt-column="19" style="width: 79.85px; min-width: 79.85px;"><col data-dt-column="20" style="width: 80.6px; min-width: 80.6px;"><col data-dt-column="21" style="width: 80.6px; min-width: 80.6px;"><col data-dt-column="22" style="width: 49.5167px; min-width: 49.5167px;">
+#<col data-dt-column="23" style="width: 63.9833px; min-width: 63.9833px;"></colgroup></table>
+
+
+print("tabla entera busca titulos")
+#print(table3.text)
+
+#table4=driver.find_element(By.CLASS_NAME,"dt-column-title")
+#print(table4.text)
+
+# Wait for the table to be loaded
+wait = WebDriverWait(driver, 10)
+table_container = wait.until(EC.presence_of_element_located((By.ID, "tblListaOpc_wrapper")))
+
+table_data = []
+
+#table4=table_container.find_elements(By.CLASS_NAME,"dt-column-title")
+#print(table4)
+#print(len(table4))
+#separator = " "
+#my_string = separator.join(table4)
+#print(my_string)
+
+#theader = table_container.find_elements(By.ID , "data-dt-column")
+#print("   cabecero  ")
+#print(theader)
+header=[]
+rows = table_container.find_elements(By.TAG_NAME, "tr")
+for row in rows:
+  row_data = []
+  headers = row.find_elements(By.TAG_NAME, "th") # Or "th" for header cells
+  for cell in headers:
+    #print(cell.text)
+    header.append(cell.text) # Get the visible text of the cell
+  #table_data.append(row_data)
+
+print("datos header")
+half=0.5*len(header)
+print(header[0:int(half)])
+del header[int(header.index('')):int(half)]
+print(0.5*len(header))
+print(header)
+naodee=["Vol. Financeiro","Vol. Impl. (%)","Delta","Gamma", "Theta ($)", "Theta (%)","Vega",	"IQ","Coberto","Travado","Descob.","Tit.","Lanç."]
+print(naodee)
+#<th class="dt-body-right dt-type-numeric dt-orderable-asc dt-orderable-desc" data-dt-column="2" rowspan="2" colspan="1"><span class="dt-column-title">Dias úteis</span><span class="dt-column-order" role="button" aria-label="Dias úteis: Activate to sort" tabindex="0"></span></th>
+print("\n")
+print("===============================================")
+print("     datos ")
+# Re-find rows inside the loop to avoid StaleElementReferenceException
+rows = table_container.find_elements(By.TAG_NAME, "tr")
+for row in rows:
+  row_data = []
+  cells = row.find_elements(By.TAG_NAME, "td") # Or "th" for header cells
+  for cell in cells:
+    row_data.append(cell.text) # Get the visible text of the cell
+  table_data.append(row_data)
+
+
+print("\n")
+print("***********************************************")
+print('table')
+print(table_data)
+print("\n")
+print("***********************************************")
+print(tabulate(table_data))
+# 24 vlores offline
+
+#(Valor de Strike - Valor da ação no momento) +
+#(preço de venda da call no strike - preço de compra da put no strike)/( Valor da ação no momento + preço de compra da put no strike)
+#display.Image(b64decode(table.screenshot_as_png))
+#display(Image(table.screenshot_as_png, width=200, height=100))
+#my_image=table.screenshot_as_png
+#display.Image(b64decode(base64_data))
+#files.download(my_image)

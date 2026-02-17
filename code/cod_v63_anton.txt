@@ -1,0 +1,187 @@
+# ======================================================
+# Instalação e importações
+# ======================================================
+%pip install -q selenium
+%pip install -q tabulate
+
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support.ui import Select
+from PIL import Image
+from IPython.display import display, HTML
+from google.colab import files
+import pandas as pd
+import requests
+from tabulate import tabulate
+import time
+
+# ======================================================
+# Configuração do navegador (modo headless)
+# ======================================================
+chrome_options = Options()
+chrome_options.add_argument("--headless")
+chrome_options.add_argument("--no-sandbox")
+chrome_options.add_argument("--disable-dev-shm-usage")
+driver = webdriver.Chrome(options=chrome_options)
+
+# ======================================================
+# Funções auxiliares
+# ======================================================
+def ajuste(url2, tiker, val_mom, strike, bid, ask):
+    formula = (float(strike) - float(val_mom)) + (float(bid) - float(ask)) / (float(val_mom) + float(ask))
+    return formula
+
+def armazem(df):
+    df.to_csv("my_data.csv", index=False)
+    df.to_excel("my_data.xlsx", index=False)
+    files.download("my_data.csv")
+    files.download("my_data.xlsx")
+    return df
+
+def cadeiastring(i, datascall, datasput):
+    if len(datascall) > 26:
+        strike = datascall[4]
+    else:
+        strike = datascall[3]
+
+    bid = datascall[11] if len(datascall) > 11 else "0.0"
+    ask = datasput[12] if len(datasput) > 12 else "0.0"
+
+    if not bid.strip():
+        bid = "0.0"
+    if not ask.strip():
+        ask = "0.0"
+
+    strike = strike.replace(".", "").replace(",", ".")
+    bid = bid.replace(".", "").replace(",", ".")
+    ask = ask.replace(".", "").replace(",", ".")
+
+    return strike, bid, ask
+
+def extrax(table_container):
+    header = []
+    rows = table_container.find_elements(By.TAG_NAME, "tr")
+    for row in rows:
+        headers = row.find_elements(By.TAG_NAME, "th")
+        for cell in headers:
+            header.append(cell.text)
+    return header
+
+def extradados(table_container):
+    table_data = []
+    rows = table_container.find_elements(By.TAG_NAME, "tr")
+    for row in rows:
+        cells = row.find_elements(By.TAG_NAME, "td")
+        row_data = [cell.text for cell in cells]
+        if row_data:
+            table_data.append(row_data)
+    return table_data
+
+# ======================================================
+# Nova função: Exibir top 30 no notebook
+# ======================================================
+def exibir_top30(df, titulo="Top 30 melhores resultados"):
+    """Ordena um DataFrame pela coluna 'formula' e exibe os 30 primeiros"""
+    if 'formula' not in df.columns:
+        print("⚠️ Coluna 'formula' não encontrada no DataFrame.")
+        return
+    df_sorted = df.sort_values(by='formula', ascending=False)
+    df_top30 = df_sorted.head(30)
+    print("\n" + "=" * 80)
+    print(f"📊 {titulo}")
+    print("=" * 80 + "\n")
+    display(HTML(df_top30.to_html(index=False)))
+    print(tabulate(df_top30, headers='keys', tablefmt='fancy_grid', showindex=False))
+    return df_top30
+
+# ======================================================
+# Função principal de scraping
+# ======================================================
+def prinp(url2):
+    print(f"\n🔍 Coletando dados de {url2}...")
+    resumo_list = []
+
+    url = f"https://opcoes.net.br/opcoes/bovespa/{url2}"
+    driver.get(url)
+    time.sleep(2)
+
+    try:
+        table2 = driver.find_element(By.ID, "divCotacaoAtual")
+        cotiz = table2.text
+        cotiz_list = cotiz.split(" ")
+        val_mom = float(cotiz_list[1].replace(".", "").replace(",", "."))
+    except Exception as e:
+        print("Erro ao obter cotação:", e)
+        return pd.DataFrame()
+
+    wait = WebDriverWait(driver, 10)
+    table_container = wait.until(EC.presence_of_element_located((By.ID, "tblListaOpc_wrapper")))
+    table_data = extradados(table_container)
+    filtered_list = list(filter(None, table_data))
+
+    datas = filtered_list
+    quantcolumns = 36
+
+    for i in range(0, len(datas), 2):
+        if len(datas[i]) < quantcolumns:
+            datas[i].extend(["0.0"] * (quantcolumns - len(datas[i])))
+        if len(datas[i + 1]) < quantcolumns:
+            datas[i + 1].extend(["0.0"] * (quantcolumns - len(datas[i + 1])))
+
+        strike, bid, ask = cadeiastring(i, datas[i], datas[i + 1])
+        formula = ajuste(url2, datas[i][0], val_mom, strike, bid, ask)
+        datas[i].append(formula)
+        datas[i + 1].append(formula)
+        datas[i].append(url2)
+        datas[i + 1].append(url2)
+
+        resumo_list.append({
+            "Ativo": url2,
+            "ticker": datas[i][0],
+            "val mom": val_mom,
+            "strike": strike,
+            "bid": bid,
+            "ask": ask,
+            "formula": formula
+        })
+
+    df2 = pd.DataFrame(resumo_list)
+
+    # ✅ Exibir top 30 dentro do notebook
+    exibir_top30(df2, titulo=f"Top 30 — {url2}")
+
+    return df2
+
+# ======================================================
+# Função para extrair lista de ativos e processar todos
+# ======================================================
+def get_sel(driver):
+    select_element = driver.find_element(By.NAME, "IdAcao")
+    select = Select(select_element)
+    option_texts = [option.text for option in select.options if len(option.text) > 1]
+
+    all_dataframes = pd.DataFrame()
+    for option_text in option_texts[:5]:  # limite inicial (pode remover)
+        print(f"\n=====> Processando {option_text}")
+        df_local = prinp(option_text)
+        all_dataframes = pd.concat([all_dataframes, df_local], axis=0, ignore_index=True)
+
+    # ✅ Mostrar top 30 geral de todos os ativos
+    exibir_top30(all_dataframes, titulo="Top 30 Geral — Todos os Ativos")
+    return all_dataframes
+
+# ======================================================
+# Execução
+# ======================================================
+url = "https://opcoes.net.br/opcoes/bovespa/AURE3"
+driver.get(url)
+time.sleep(2)
+
+all_results = get_sel(driver)
+driver.quit()
+
+print("\n✅ Execução concluída.")
+

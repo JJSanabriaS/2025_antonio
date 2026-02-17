@@ -1,0 +1,86 @@
+%pip install selenium
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+from PIL import Image
+from IPython.display import display
+from google.colab import files
+import requests
+from selenium.webdriver.support.ui import Select
+
+
+# Configure Chrome options for headless mode
+chrome_options = Options()
+chrome_options.add_argument("--headless")
+chrome_options.add_argument("--no-sandbox")
+chrome_options.add_argument("--disable-dev-shm-usage")
+# Initialize the WebDriver (e.g., Chrome) with the configured options
+driver = webdriver.Chrome(options=chrome_options)
+
+
+# Navigate to the webpage containing the div-based table
+url="https://opcoes.net.br/opcoes/bovespa/VALE3"
+
+driver.get(url) # Replace with the actual URL
+response = requests.get(url)
+text_content = response.text
+print(text_content)
+
+# Wait for the table element to be present (adjust locator as needed)
+# This assumes the main table div has a specific class, e.g., 'table-container'
+
+
+# Find all "row" divs within the table container
+# Assuming rows have a class like 'table-row'
+#rows = table_container.find_elements(By.CLASS_NAME, "data-row")
+
+table=driver.find_element(By.ID,"divMinMax")
+print("valores maximos")
+print(table.text)
+
+table2=driver.find_element(By.ID,"divCotacaoAtual")
+print("cotacao atual")
+print(table2.text)
+
+
+# Example: Assuming you have a dropdown element
+#tpcalls = driver.find_element(By.ID, "tpCalls")
+#tpPuts = driver.find_element(By.ID, "tpPuts")
+#tpTodas = driver.find_element(By.ID, "tpTodas")
+#print([tpcalls.is_selected() , tpPuts.is_selected() ,tpTodas.is_selected()])
+
+vencimentos = driver.find_element(By.ID, "grade-vencimentos-dates")
+print("lista vencimentos")
+print(vencimentos.text)
+ids = driver.find_elements(By.TAG_NAME,"input")
+vencimentos=[]
+datas=[]
+for ii in ids:
+    #print ii.tag_name
+    #print (ii.get_attribute('id'))    # id name as string
+    datas.append(ii.get_attribute('id'))
+    vencimentos.append(ii.get_attribute('selected'))
+
+#print(datas)
+#print(vencimentos)
+
+
+print(datas[0:3])
+print(vencimentos[0:3])
+print(datas[3:])
+print(vencimentos[3:])
+
+
+
+table2=driver.find_element(By.ID,"strike-range")
+print("range strike")
+print(table2.text)
+
+#display.Image(b64decode(table.screenshot_as_png))
+#display(Image(table.screenshot_as_png, width=200, height=100))
+#my_image=table.screenshot_as_png
+#display.Image(b64decode(base64_data))
+#files.download(my_image)
+

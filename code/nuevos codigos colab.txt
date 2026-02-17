@@ -1,0 +1,225 @@
+nuevos codigos colab
+
+
+https://opcoes.net.br/opcoes/bovespa/ALOS3
+a buscar 
+
+<div id="divMinMax">
+<table>
+<tbody><tr><td>Mínima:</td><td>&nbsp;<span data-mkt-prop="mi" data-mkt-render="renderBRL" class="">R$ 25,80</span></td></tr><tr><td>Máxima:</td><td>&nbsp;<span data-mkt-prop="ma" data-mkt-render="renderBRL" class="">R$ 26,20</span></td></tr></tbody></table></div>
+
+<span data-mkt-prop="p" data-mkt-classfnc="getClassForChange" data-mkt-render="renderBRL" class="red">R$ 25,83</span>
+
+<span data-mkt-prop="c" data-mkt-classfnc="getClassForChange" data-mkt-render="renderPercentNumberWithSignAndSymbol" class="red">-0,11%</span>
+
+
+funcional
+1. +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  #%pip install selenium
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+
+# Configure Chrome options for headless mode
+chrome_options = Options()
+chrome_options.add_argument("--headless")
+chrome_options.add_argument("--no-sandbox")
+chrome_options.add_argument("--disable-dev-shm-usage")
+
+# Initialize the WebDriver (e.g., Chrome) with the configured options
+driver = webdriver.Chrome(options=chrome_options)
+
+# Navigate to the webpage containing the div-based table
+driver.get("https://opcoes.net.br/opcoes/bovespa/ALOS3") # Replace with the actual URL
+
+# Wait for the table element to be present (adjust locator as needed)
+# This assumes the main table div has a specific class, e.g., 'table-container'
+
+
+# Find all "row" divs within the table container
+# Assuming rows have a class like 'table-row'
+#rows = table_container.find_elements(By.CLASS_NAME, "data-row")
+
+table=driver.find_element(By.ID,"divMinMax")
+print(table)
+# Create a list to store the extracted table data
+table_data = []
+
+# Iterate through each row
+#for row in rows:
+    # Find all "cell" divs within the current row
+    # Assuming cells have a class like 'table-cell'
+ #   cells = row.find_elements(By.TAG_NAME, "div")
+
+    # Extract text from each cell and add it to a list representing the current row
+  #  row_data = [cell.text for cell in cells]
+   # table_data.append(row_data)
+
+# Print or process the extracted table data
+for row_data in table_data:
+    print(row_data)
+
+# Close the browser
+driver.quit()
+
+output
+
+<selenium.webdriver.remote.webelement.WebElement (session="5e00ba1a14051f61f88ccb5c32a14f09", element="f.1A6E576DCAD51C419776B5602B420BDC.d.E395F64AACBE2F1304335BE0412466BE.e.38")>
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+
+pip install selenium
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+
+# Configure Chrome options for headless mode
+chrome_options = Options()
+chrome_options.add_argument("--headless")
+chrome_options.add_argument("--no-sandbox")
+chrome_options.add_argument("--disable-dev-shm-usage")
+
+# Initialize the WebDriver (e.g., Chrome) with the configured options
+driver = webdriver.Chrome(options=chrome_options)
+
+# Navigate to the webpage containing the div-based table
+driver.get("https://opcoes.net.br/opcoes/bovespa/ALOS3") # Replace with the actual URL
+
+# Wait for the table element to be present (adjust locator as needed)
+# This assumes the main table div has a specific class, e.g., 'table-container'
+table_container = WebDriverWait(driver, 10).until(
+    EC.presence_of_element_located((By.CLASS_NAME, "table-container"))
+)
+
+# Find all "row" divs within the table container
+# Assuming rows have a class like 'table-row'
+rows = table_container.find_elements(By.CLASS_NAME, "table-row")
+
+# Create a list to store the extracted table data
+table_data = []
+
+# Iterate through each row
+for row in rows:
+    # Find all "cell" divs within the current row
+    # Assuming cells have a class like 'table-cell'
+    cells = row.find_elements(By.CLASS_NAME, "table-cell")
+
+    # Extract text from each cell and add it to a list representing the current row
+    row_data = [cell.text for cell in cells]
+    table_data.append(row_data)
+
+# Print or process the extracted table data
+for row_data in table_data:
+    print(row_data)
+
+# Close the browser
+driver.quit()
+
+
+https://colab.research.google.com/drive/1wHoroh7sQ7ADPT0L4Zfk3t2a2yc2D1Al?usp=sharing#scrollTo=d-4KdKxOgBcS
+
+
+import requests
+from bs4 import BeautifulSoup
+
+url = "https://opcoes.net.br/opcoes/bovespa/AAPL34"
+response = requests.get(url)
+html_content = response.text
+soup = BeautifulSoup(html_content, 'html.parser')
+print(soup.get_text())
+print(response)
+
+#busca = response.find_element(By.ID, 'divMinMax')
+#print("cadena")
+#print(busca.text)
+#print(busca.value_of_css_property)
+#print(busca.__class__)
+
+#<span data-mkt-prop="mi" data-mkt-render="renderBRL" class="">R$ 25,80</span>
+
+#span_element = response.find_element(By.ID, "data-mkt-prop") # Adjust locator as needed
+
+    # Get the text content of the span element
+#span_text = span_element.text
+
+    
+    
+    from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from bs4 import BeautifulSoup
+
+# Setup Chrome driver (ensure you have chromedriver installed and in your PATH)
+service = Service('/path/to/chromedriver') # Replace with your chromedriver path
+driver = webdriver.Chrome(service=service)
+
+url = "https://opcoes.net.br/opcoes/bovespa/AAPL34" # Replace with your target URL
+driver.get(url)
+
+# Wait for JavaScript to execute and content to load (adjust as needed)
+driver.implicitly_wait(10) 
+
+# Get the page source after JavaScript execution
+html = driver.page_source
+
+# Parse the HTML with BeautifulSoup
+soup = BeautifulSoup(html, 'html.parser')
+
+# Now you can use BeautifulSoup to extract elements from the rendered page
+# For example, finding a specific element with a class:
+# element = soup.find('div', class_='some-class')
+
+driver.quit()
+
+
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+# Initialize the WebDriver (e.g., Chrome)
+driver = webdriver.Chrome()
+
+# Navigate to the webpage containing the div-based table
+driver.get("your_webpage_url") # Replace with the actual URL
+
+# Wait for the table element to be present (adjust locator as needed)
+# This assumes the main table div has a specific class, e.g., 'table-container'
+table_container = WebDriverWait(driver, 10).until(
+    EC.presence_of_element_located((By.CLASS_NAME, "table-container"))
+)
+
+# Find all "row" divs within the table container
+# Assuming rows have a class like 'table-row'
+rows = table_container.find_elements(By.CLASS_NAME, "table-row")
+
+# Create a list to store the extracted table data
+table_data = []
+
+# Iterate through each row
+for row in rows:
+    # Find all "cell" divs within the current row
+    # Assuming cells have a class like 'table-cell'
+    cells = row.find_elements(By.CLASS_NAME, "table-cell")
+    
+    # Extract text from each cell and add it to a list representing the current row
+    row_data = [cell.text for cell in cells]
+    table_data.append(row_data)
+
+# Print or process the extracted table data
+for row_data in table_data:
+    print(row_data)
+
+# Close the browser
+driver.quit()
+
+
+
+
+

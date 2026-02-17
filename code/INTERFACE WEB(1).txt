@@ -1,0 +1,63 @@
+# ===========================================================
+# INTERFACE WEB
+# ===========================================================
+
+# Obter opções dinâmicas
+driver.get("https://opcoes.net.br/opcoes/bovespa/AURE3")
+select_element = WebDriverWait(driver, 10).until(
+    EC.presence_of_element_located((By.NAME, "IdAcao"))
+)
+select = Select(select_element)
+option_texts = ["todo"] + [opt.text.strip() for opt in select.options if len(opt.text.strip()) > 1]
+
+# Widgets
+dropdown = widgets.Dropdown(options=option_texts, description="Ativo:")
+threshold_input = widgets.FloatText(value=-0.05, description="Threshold:")
+run_button = widgets.Button(description="🚀 Rodar Scraper", button_style="success")
+download_button = widgets.Button(description="💾 Baixar CSVs", button_style="info")
+
+# Globais
+final_df = pd.DataFrame()
+top30 = pd.DataFrame()
+
+# Função principal de execução
+def on_run_clicked(b):
+    global final_df, top30
+    clear_output(wait=True)
+    display(ui)
+    print(f"🔍 Executando para {dropdown.value} ...")
+    final_df = get_sel(driver, dropdown.value)
+
+    if final_df.empty:
+        print("⚠️ Nenhum dado encontrado.")
+        return
+
+
+    display(final_df)
+    # Filtragem
+    final_df["MinBidAsk"] = final_df[["Bid", "Ask"]].min(axis=1)
+    final_df = final_df[final_df["MinBidAsk"] >= threshold_input.value]
+    top30 = final_df.sort_values(by="Formula", ascending=False).head(30)
+
+    print(f"\n✅ Coleta concluída — {len(final_df)} linhas após filtro.")
+    display(top30)
+
+def on_download_clicked(b):
+    if not final_df.empty:
+        armazem(final_df, "full")
+        armazem(top30, "top30")
+    else:
+        print("⚠️ Nenhum dado para baixar. Rode o scraper primeiro.")
+
+run_button.on_click(on_run_clicked)
+download_button.on_click(on_download_clicked)
+
+ui = widgets.VBox([
+    widgets.HTML("<h3>📊 Interface de Scraper — Opções Bovespa</h3>"),
+    dropdown,
+    threshold_input,
+    widgets.HBox([run_button, download_button])
+])
+
+display(ui)
+

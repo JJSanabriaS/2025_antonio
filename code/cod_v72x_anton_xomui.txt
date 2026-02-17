@@ -1,0 +1,250 @@
+# =========================================
+# STEP 1 — INSTALL DEPENDENCIES
+# =========================================
+!apt-get update -qq
+!apt-get install -qq chromium-chromedriver
+!pip install -q selenium tabulate ipywidgets pillow pandas requests openpyxl
+
+# =========================================
+# STEP 2 — IMPORTS
+# =========================================
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait, Select
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
+from google.colab import files
+from IPython.display import display, clear_output
+import pandas as pd
+import time
+from datetime import datetime
+
+import ipywidgets as widgets
+
+# =========================================
+# STEP 3 — CONFIGURAÇÃO DO DRIVER
+# =========================================
+chrome_options = Options()
+chrome_options.add_argument("--headless")
+chrome_options.add_argument("--no-sandbox")
+chrome_options.add_argument("--disable-dev-shm-usage")
+chrome_options.add_argument("--window-size=1920,1080")
+
+driver = webdriver.Chrome(options=chrome_options)
+wait = WebDriverWait(driver, 15)
+
+# =========================================
+# STEP 4 — FUNÇÕES REAIS (EXTRAÍDAS DO SEU CÓDIGO)
+# =========================================
+def ajuste(url2, tiker, val_mom, strike, bid, ask):
+    try:
+        formula = (float(strike) - float(val_mom)) + (float(bid) - float(ask)) / (float(val_mom) + float(ask))
+    except Exception:
+        formula = 0.0
+    return formula
+
+
+def cadeiastring(i, datascall, datasput):
+    try:
+        strike = datascall[4] if len(datascall) > 26 else datascall[3]
+        bid = datascall[11] or "0.0"
+        ask = datasput[12] or "0.0"
+        strike = strike.replace(".", "").replace(",", ".")
+        bid = bid.replace(".", "").replace(",", ".")
+        ask = ask.replace(".", "").replace(",", ".")
+        return float(strike), float(bid), float(ask)
+    except Exception:
+        return 0.0, 0.0, 0.0
+
+
+def extradados(table_container):
+    retries = 3
+    for attempt in range(retries):
+        try:
+            rows = table_container.find_elements(By.TAG_NAME, "tr")
+            table_data = [[cell.text for cell in row.find_elements(By.TAG_NAME, "td")] for row in rows]
+            return table_data
+        except StaleElementReferenceException:
+            print(f"Tentando recarregar tabela... ({attempt + 1}/{retries})")
+            time.sleep(1)
+    return []
+
+
+def prinp(url2):
+    print(f"\n==== Iniciando {url2} ====")
+    url = f"https://opcoes.net.br/opcoes/bovespa/{url2}"
+    driver.get(url)
+
+    try:
+        table2 = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.ID, "divCotacaoAtual"))
+        )
+        cotiz = table2.text.split()
+        val_mom = float(cotiz[1].replace(".", "").replace(",", "."))
+    except Exception:
+        val_mom = 0.0
+
+    try:
+        table_container = WebDriverWait(driver, 15).until(
+            EC.presence_of_element_located((By.ID, "tblListaOpc_wrapper"))
+        )
+    except TimeoutException:
+        print("⚠️ Tabela não carregou.")
+        return pd.DataFrame()
+
+    table_data = extradados(table_container)
+    if not table_data:
+        return pd.DataFrame()
+
+    resumo_list = []
+    for i in range(3, len(table_data), 2):
+        if i + 1 >= len(table_data):
+            break
+        strike, bid, ask = cadeiastring(i, table_data[i], table_data[i + 1])
+        formula = ajuste(url2, table_data[i][0] if table_data[i] else "N/A", val_mom, strike, bid, ask)
+        resumo_list.append({
+            "Ativo": url2,
+            "Ticker": table_data[i][0] if table_data[i] else "N/A",
+            "ValMom": val_mom,
+            "Strike": strike,
+            "Bid": bid,
+            "Ask": ask,
+            "Formula": formula
+        })
+
+    return pd.DataFrame(resumo_list)
+
+
+def get_sel(driver, string):
+    all_dataframes = pd.DataFrame()
+    if string == 'todo':
+        print("🔎 Coletando todas as opções disponíveis...")
+        retries = 3
+        for attempt in range(retries):
+            try:
+                select_element = WebDriverWait(driver, 10).until(
+                    EC.presence_of_element_located((By.NAME, "IdAcao"))
+                )
+                select = Select(select_element)
+                all_options = select.options
+                option_texts = [opt.text.strip() for opt in all_options if len(opt.text.strip()) > 1]
+                break
+            except (StaleElementReferenceException, TimeoutException):
+                print(f"Tentativa {attempt + 1}/{retries} falhou, tentando novamente...")
+                time.sleep(2)
+
+        for idx, option_text in enumerate(option_texts, start=1):
+            print(f"\n[{idx}/{len(option_texts)}] Processando {option_text}...")
+            try:
+                driver.get(f"https://opcoes.net.br/opcoes/bovespa/{option_text}")
+                WebDriverWait(driver, 15).until(
+                    EC.presence_of_element_located((By.ID, "tblListaOpc_wrapper"))
+                )
+                df_temp = prinp(option_text)
+                if not df_temp.empty:
+                    all_dataframes = pd.concat([all_dataframes, df_temp], ignore_index=True)
+            except Exception as e:
+                print(f"⚠️ Erro em {option_text}: {e}")
+                continue
+    else:
+        print(f"🔎 Coletando dados do ativo {string}...")
+        df_temp = prinp(string)
+        all_dataframes = pd.concat([all_dataframes, df_temp], ignore_index=True)
+
+    print("\n✅ Coleta concluída.")
+    print(f"Total de registros: {len(all_dataframes)}")
+    return all_dataframes
+
+
+def armazem(df, name):
+    """Salva dataframe em CSV e XLSX."""
+    df.to_csv(name + ".csv", index=False)
+    df.to_excel(name + ".xlsx", index=False)
+    return [name + ".csv", name + ".xlsx"]
+
+def get_ativos(driver, url="https://opcoes.net.br/opcoes/bovespa/AURE3"):
+    """Obtém opções do dropdown IdAcao."""
+    driver.get(url)
+    try:
+        select_element = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.NAME, "IdAcao"))
+        )
+        select = Select(select_element)
+        options = [opt.text.strip() for opt in select.options if len(opt.text.strip()) > 1]
+        options.insert(0, "todo")
+        return options
+    except Exception as e:
+        print("Erro ao obter ativos:", e)
+        return ["todo"]
+
+# =========================================
+# STEP 5 — INTERFACE INTERATIVA
+# =========================================
+ativos = get_ativos(driver)
+dropdown_ativos = widgets.Dropdown(
+    options=ativos,
+    value=ativos[0],
+    description='Ativo:',
+    style={'description_width': '60px'},
+    layout=widgets.Layout(width='50%')
+)
+
+input_threshold = widgets.FloatText(
+    value=0.05,
+    description='Threshold:',
+    style={'description_width': '90px'},
+    layout=widgets.Layout(width='50%')
+)
+
+btn_run = widgets.Button(
+    description="Executar Scraper",
+    button_style='success',
+    icon='play'
+)
+
+btn_download = widgets.Button(
+    description="Baixar Arquivos",
+    button_style='info',
+    icon='download'
+)
+btn_download.layout.visibility = 'hidden'
+
+output = widgets.Output()
+global_final_df = {"df": None, "top30": None}
+
+def on_run_clicked(b):
+    clear_output(wait=True)
+    display(ui)
+    ativo = dropdown_ativos.value
+    threshold = input_threshold.value
+    print(f"🔎 Executando scraper para {ativo} (threshold {threshold}) ...")
+    df = get_sel(driver, ativo)
+    if df.empty:
+        print("⚠️ Nenhum dado encontrado.")
+        return
+    df["MinBidAsk"] = df[["Bid", "Ask"]].min(axis=1)
+    df = df[df["MinBidAsk"] >= threshold]
+    top30 = df.sort_values(by="Formula", ascending=False).head(30)
+    display(top30)
+    armazem(df, "full")
+    armazem(top30, "top30")
+    global_final_df["df"] = df
+    global_final_df["top30"] = top30
+    btn_download.layout.visibility = 'visible'
+    print("\n✅ Scraper finalizado com sucesso.")
+
+def on_download_clicked(b):
+    if global_final_df["df"] is not None:
+        print("📦 Iniciando download dos arquivos gerados...")
+        files.download("full.csv")
+        files.download("top30.csv")
+    else:
+        print("⚠️ Nenhum arquivo disponível para download.")
+
+btn_run.on_click(on_run_clicked)
+btn_download.on_click(on_download_clicked)
+
+ui = widgets.VBox([dropdown_ativos, input_threshold, btn_run, btn_download])
+display(ui)
+

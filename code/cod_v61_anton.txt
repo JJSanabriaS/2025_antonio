@@ -1,0 +1,76 @@
+# --- Dependências ---
+!pip install -q ipywidgets selenium tabulate pandas
+from IPython.display import display, HTML
+import ipywidgets as widgets
+from selenium.webdriver.support.ui import Select
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
+import pandas as pd
+import time
+
+# --- Inicializa o WebDriver headless ---
+chrome_options = Options()
+chrome_options.add_argument("--headless")
+chrome_options.add_argument("--no-sandbox")
+chrome_options.add_argument("--disable-dev-shm-usage")
+driver = webdriver.Chrome(options=chrome_options)
+
+# --- Função: obter opções de IdAcao e vencimentos ---
+def get_dropdown_values(url="https://opcoes.net.br/opcoes/bovespa/AURE3"):
+    driver.get(url)
+    time.sleep(3)
+
+    # Dropdown 1: IdAcao
+    select_element = driver.find_element(By.NAME, "IdAcao")
+    select = Select(select_element)
+    ativos = [opt.text for opt in select.options if len(opt.text.strip()) > 0]
+
+    # Dropdown 2: vencimentos (pegando inputs com atributo id)
+    ids = driver.find_elements(By.TAG_NAME, "input")
+    vencimentos = [ii.get_attribute('id') for ii in ids if ii.get_attribute('id')]
+    vencimentos = vencimentos[3:]  # conforme solicitado
+
+    return ativos, vencimentos
+
+# --- Função de scraping (chama seu prinp adaptado) ---
+def scrape_selected(ativo, vencimento):
+    print(f"Executando scraping para ativo={ativo}, vencimento={vencimento} ...")
+    try:
+        df = prinp(ativo)  # chama sua função existente
+        display(df.head())
+    except Exception as e:
+        print("Erro no scraping:", e)
+
+# --- Interface interativa ---
+ativos, vencimentos = get_dropdown_values()
+
+ativo_dd = widgets.Dropdown(
+    options=ativos,
+    description="Ativo:",
+    layout=widgets.Layout(width="50%")
+)
+venc_dd = widgets.Dropdown(
+    options=vencimentos,
+    description="Vencimento:",
+    layout=widgets.Layout(width="50%")
+)
+btn = widgets.Button(description="🔍 Executar Scraper", button_style='success')
+output = widgets.Output()
+
+def on_click(b):
+    output.clear_output()
+    with output:
+        scrape_selected(ativo_dd.value, venc_dd.value)
+
+btn.on_click(on_click)
+
+display(
+    widgets.VBox([
+        widgets.HTML("<h3>🔎 Scraper Interativo — Opções B3</h3>"),
+        widgets.HBox([ativo_dd, venc_dd]),
+        btn,
+        output
+    ])
+)
+

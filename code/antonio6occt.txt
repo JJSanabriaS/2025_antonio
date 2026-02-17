@@ -1,0 +1,34 @@
+Desculpa a demora amigo. Então quero os 30 melhores valores dessa operação para TODOS os strikes de TODAS as ações da bolsa. Para isso preciso inserir os seguintes filtros no excel: O vencimento e a quantidade disponível no mercado (a menor quantidade entre bid, ask e a ação). Essas duas informações tem no site que te passei. O valor da ação em tempo real pega do site, o preço de venda da call é o BID da call, e preço de compra da put é o ASK da put.
+
+Essa planilha que vc me enviou vc certamente pegou após ou antes do funcionamento do pregão. O pregão se não me engano vai de 10 as 17:30. Então não aparecem os valores de BID e ASK.
+
+Apenas acrescentando um denominador na fórmula:
+(Valor de Strike - Valor da ação no momento) +
+(preço de venda da call no strike - preço de compra da put no strike)/( Valor da ação no momento + preço de compra da put no strike)
+
+Desculpa a ignorância,nNão entendi os detalhes obtidos via code...Tbm não conheço google colab.
+Me explica melhor por favor o que fazer que eu faço.
+
+Outra coisa, tem que ver como vai fazer pro excel não ficar muito pesado, pois é informação pra caramba de todas as opções de todas as ações para todos os vencimentos da B3.
+
+Segue a imagem. Você vai usar todas essas informações. Lembrando:
+1 - Quando for definir o intervalo de strikes vai pegar o intervalor máximo.
+2 - O excel deve permitir eu definir o vencimento, que também circulei na imagem.
+3 - Essa imagem você só consegue obter durante o pregão.
+4 - Perceba que existe colunas chamadas Qtd. Bid e Qtd. Ask. Essas colunas serão importantes para eu filtrar pelo volume.
+Por exemplo que posso querer fazer a operação somente se tiver pelo menos 500 papei a disposição. Então deve haver pelo menos 500 papéis disponiveis entre essas colunas e a ação em si. 
+
+Boa tarde. Eu quero para todos os strikes
+
+Antônio
+06/10/2025 às 14:29
+
+Para todos os intervalos.
+
+Antônio
+06/10/2025 às 14:29
+
+Vou gerar para você agora um exemplo em tempo real. 
+
+Tenho que poder filtrar no excel a data de vencimento e o numero mínimo de papéis. O número mínimo de papéis é o menor numero entre a bid da call e o ask da put.
+

@@ -1,0 +1,41 @@
+# =====================================================
+# 🔧 Instalação e Configuração
+# =====================================================
+!pip install -q flask flask-ngrok selenium pandas tabulate
+
+from flask import Flask, render_template_string, request, jsonify
+from flask_ngrok import run_with_ngrok
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait, Select
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
+import pandas as pd
+import time
+
+# =====================================================
+# 🚘 Configuração do Selenium (modo headless)
+# =====================================================
+chrome_options = Options()
+chrome_options.add_argument("--headless")
+chrome_options.add_argument("--no-sandbox")
+chrome_options.add_argument("--disable-dev-shm-usage")
+driver = webdriver.Chrome(options=chrome_options)
+
+
+# =====================================================
+# 🌐 Flask + Ngrok
+# =====================================================
+app = Flask(__name__)
+run_with_ngrok(app)  # inicia ngrok automaticamente
+
+
+# =====================================================
+# ⚙️ Funções auxiliares
+# =====================================================
+def get_ativos():
+    """Obtém a lista de ativos disponíveis (dropdown IdAcao)."""
+    driver.get("https://opcoes.net.br/opcoes/bovespa/AURE3")
+    try:
+

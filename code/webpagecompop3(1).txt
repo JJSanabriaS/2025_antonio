@@ -1,0 +1,182 @@
+#Salve o código acima como scraper_app.py
+#No terminal, execute streamlit run scraper_app.py
+# ative local server (geralmente http://localhost:8501)
+
+# =========================================
+# STEP 0 — INSTALAÇÃO
+# =========================================
+# Execute no terminal local apenas uma vez:
+# pip install streamlit selenium pandas pillow tabulate openpyxl requests
+
+# =========================================
+# STEP 1 — CÓDIGO COMPLETO STREAMLIT LOCAL
+# =========================================
+import streamlit as st
+import pandas as pd
+import time
+from datetime import datetime
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait, Select
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
+
+# =========================================
+# CONFIGURAÇÃO SELENIUM (local)
+# =========================================
+chrome_options = Options()
+chrome_options.add_argument("--headless")  # Remova se quiser ver o navegador
+chrome_options.add_argument("--window-size=1920,1080")
+driver = webdriver.Chrome(options=chrome_options)
+wait = WebDriverWait(driver, 15)
+
+
+# =========================================
+# FUNÇÕES REAIS (mesmas do seu código)
+# =========================================
+def get_ativos(driver, url="https://opcoes.net.br/opcoes/bovespa/AURE3"):
+    """Obtém opções de ativos do dropdown IdAcao."""
+    driver.get(url)
+    try:
+        select_element = wait.until(EC.presence_of_element_located((By.NAME, "IdAcao")))
+        select = Select(select_element)
+        options = [opt.text.strip() for opt in select.options if len(opt.text.strip()) > 1]
+        options.insert(0, "todo")
+        return options
+    except Exception as e:
+        st.warning(f"Erro ao obter ativos: {e}")
+        return ["todo"]
+
+
+def get_vencimentos(driver, url="https://opcoes.net.br/opcoes/bovespa/AURE3"):
+    """Obtém lista de vencimentos (checkboxes)."""
+    driver.get(url)
+    try:
+        wait.until(EC.presence_of_element_located((By.ID, "grade-vencimentos-dates")))
+        time.sleep(2)
+        container = driver.find_element(By.ID, "grade-vencimentos-dates")
+        checkboxes = container.find_elements(By.TAG_NAME, "input")
+        labels, values = [], []
+        for cb in checkboxes:
+            label_id = cb.get_attribute("id")
+            data_du = cb.get_attribute("data-du")
+            if label_id:
+                labels.append(f"{label_id} - {data_du} d.u.")
+                values.append(label_id)
+        return labels, values
+    except TimeoutException:
+        st.warning("⚠️ Timeout ao carregar vencimentos.")
+        return [], []
+
+
+def ajuste(url2, tiker, val_mom, strike, bid, ask):
+    try:
+        formula = (float(strike) - float(val_mom)) + (float(bid) - float(ask)) / (float(val_mom) + float(ask))
+    except Exception:
+        formula = 0.0
+    return formula
+
+
+def cadeiastring(i, datascall, datasput):
+    try:
+        strike = datascall[4] if len(datascall) > 26 else datascall[3]
+        bid = datascall[11] or "0.0"
+        ask = datasput[12] or "0.0"
+        strike = strike.replace(".", "").replace(",", ".")
+        bid = bid.replace(".", "").replace(",", ".")
+        ask = ask.replace(".", "").replace(",", ".")
+        return float(strike), float(bid), float(ask)
+    except Exception:
+        return 0.0, 0.0, 0.0
+
+
+def extradados(table_container):
+    retries = 3
+    for attempt in range(retries):
+        try:
+            rows = table_container.find_elements(By.TAG_NAME, "tr")
+            return [[cell.text for cell in row.find_elements(By.TAG_NAME, "td")] for row in rows]
+        except StaleElementReferenceException:
+            time.sleep(1)
+    return []
+
+
+def prinp(url2):
+    """Executa o scraping de um ativo."""
+    url = f"https://opcoes.net.br/opcoes/bovespa/{url2}"
+    driver.get(url)
+    try:
+        table2 = wait.until(EC.presence_of_element_located((By.ID, "divCotacaoAtual")))
+        cotiz = table2.text.split()
+        val_mom = float(cotiz[1].replace(".", "").replace(",", "."))
+    except Exception:
+        val_mom = 0.0
+    try:
+        table_container = wait.until(EC.presence_of_element_located((By.ID, "tblListaOpc_wrapper")))
+    except TimeoutException:
+        return pd.DataFrame()
+    table_data = extradados(table_container)
+    resumo_list = []
+    for i in range(3, len(table_data), 2):
+        if i + 1 >= len(table_data):
+            break
+        strike, bid, ask = cadeiastring(i, table_data[i], table_data[i + 1])
+        formula = ajuste(url2, table_data[i][0] if table_data[i] else "N/A", val_mom, strike, bid, ask)
+        resumo_list.append({"Ativo": url2, "Strike": strike, "Bid": bid, "Ask": ask, "Formula": formula})
+    return pd.DataFrame(resumo_list)
+
+
+def get_sel(driver, ativo):
+    """Executa scraping de um ativo específico."""
+    if ativo == "todo":
+        ativos = get_ativos(driver)
+        df_all = pd.concat([prinp(a) for a in ativos[1:]], ignore_index=True)
+        return df_all
+    else:
+        return prinp(ativo)
+
+
+# =========================================
+# INTERFACE STREAMLIT LOCAL
+# =========================================
+st.set_page_config("Scraper Opções B3", layout="wide")
+
+st.title("📊 Scraper de Opções B3 — Interface Local")
+
+if st.button("🔄 Popular Listas"):
+    with st.spinner("Obtendo dados..."):
+        ativos = get_ativos(driver)
+        labels, values = get_vencimentos(driver)
+    st.session_state["ativos"] = ativos
+    st.session_state["venc_labels"] = labels
+    st.session_state["venc_values"] = values
+    st.success("✅ Listas carregadas com sucesso!")
+
+if "ativos" in st.session_state:
+    ativo = st.selectbox("Escolha o ativo:", st.session_state["ativos"])
+    venc_sel = st.multiselect("Selecione vencimentos:", st.session_state["venc_labels"])
+    threshold = st.number_input("Valor mínimo Bid/Ask:", value=0.05, step=0.01)
+
+    if st.button("▶️ Executar Scraper"):
+        with st.spinner(f"Coletando dados de {ativo}..."):
+            df = get_sel(driver, ativo)
+            df["MinBidAsk"] = df[["Bid", "Ask"]].min(axis=1)
+            df_filtrado = df[df["MinBidAsk"] >= threshold]
+            top30 = df_filtrado.sort_values(by="Formula", ascending=False).head(30)
+        st.session_state["df"] = df_filtrado
+        st.session_state["top30"] = top30
+        st.success(f"✅ Dados obtidos: {len(df_filtrado)} registros.")
+        st.dataframe(top30)
+
+    if "df" in st.session_state and st.button("💾 Baixar Arquivos"):
+        df = st.session_state["df"]
+        top30 = st.session_state["top30"]
+        df.to_csv("resumo.csv", index=False)
+        top30.to_csv("top30.csv", index=False)
+        st.download_button("📥 Baixar resumo.csv", df.to_csv(index=False), "resumo.csv")
+        st.download_button("📥 Baixar top30.csv", top30.to_csv(index=False), "top30.csv")
+
+driver.quit()
+
+

@@ -1,0 +1,109 @@
+Salve como app.py
+
+Execute:
+python app.py
+
+Abra no navegador:
+👉 http://127.0.0.1:5000
+
+O servidor Flask recarrega automaticamente ao salvar o arquivo.
+
+O scraping roda em background e retorna os 30 melhores resultados filtrados.
+
+
+APP LOCAL COM THREADING E RELOAD
+
+Copie tudo e execute como python app.py
+(ou em um bloco Jupyter — o servidor roda em thread paralela)
+
+# =====================================================
+# 🔧 Instalações necessárias (execute 1x)
+# =====================================================
+# !pip install flask selenium pandas tabulate
+
+import threading
+import time
+import pandas as pd
+from flask import Flask, render_template_string, request, jsonify
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait, Select
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+from selenium.common.exceptions import TimeoutException, StaleElementReferenceException
+
+# =====================================================
+# 🌐 Configuração do Flask
+# =====================================================
+app = Flask(__name__)
+
+# =====================================================
+# 🚘 Selenium (modo headless)
+# =====================================================
+chrome_options = Options()
+chrome_options.add_argument("--headless=new")
+chrome_options.add_argument("--no-sandbox")
+chrome_options.add_argument("--disable-dev-shm-usage")
+driver = webdriver.Chrome(options=chrome_options)
+
+
+# =====================================================
+# ⚙️ Funções auxiliares de scraping
+# =====================================================
+def get_ativos():
+    """Obtém os ativos disponíveis."""
+    driver.get("https://opcoes.net.br/opcoes/bovespa/AURE3")
+    try:
+        select_element = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.NAME, "IdAcao"))
+        )
+        select = Select(select_element)
+        options = [opt.text.strip() for opt in select.options if len(opt.text.strip()) > 1]
+        if "todo" not in options:
+            options.insert(0, "todo")
+        return options
+    except Exception as e:
+        print("Erro ao obter ativos:", e)
+        return ["todo"]
+
+def get_vencimentos():
+    """Obtém os vencimentos (datas futuras)."""
+    try:
+        driver.get("https://opcoes.net.br/opcoes/bovespa/AURE3")
+        select_elem = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.NAME, "vencimentos"))
+        )
+        select = Select(select_elem)
+        vals = [opt.text.strip() for opt in select.options if len(opt.text.strip()) > 1]
+        return vals[3:]
+    except Exception as e:
+        print("Erro ao obter vencimentos:", e)
+        return []
+
+def scrap_data(ativo, threshold, vencimento=None):
+    """Executa o scraping dos dados principais."""
+    print(f"Scraping {ativo} | threshold={threshold} | venc={vencimento}")
+    driver.get(f"https://opcoes.net.br/opcoes/bovespa/{ativo}")
+
+    try:
+        WebDriverWait(driver, 15).until(
+            EC.presence_of_element_located((By.ID, "tblListaOpc_wrapper"))
+        )
+    except TimeoutException:
+        print("Tabela não carregou a tempo.")
+        return pd.DataFrame()
+
+    try:
+        table = driver.find_element(By.ID, "tblListaOpc_wrapper")
+        rows = table.find_elements(By.TAG_NAME, "tr")
+
+        data = []
+        for row in rows:
+            cols = [c.text for c in row.find_elements(By.TAG_NAME, "td")]
+            if len(cols) > 12:
+                try:
+                    bid = float(cols[11].replace(",", "."))
+                    ask = float(cols[12].replace(",", "."))
+                    if min(bid, ask) >= threshold:
+                        data.append({"T
+

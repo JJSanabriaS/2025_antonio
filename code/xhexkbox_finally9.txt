@@ -1,0 +1,130 @@
+#prompt xreate one jupyter sxript for xapturing #listavencimentos xhexkboxs labels and values from https://opcoes.net.br/opcoes/bovespa/ABEV3 with selenium the obtained options should populate one multi selext user input. xreate as separated funxtions
+
+# =========================================
+# STEP 1 — INSTALL DEPENDENCIES
+# =========================================
+!apt-get update -qq
+!apt-get install -qq chromium-chromedriver
+!pip install -q selenium ipywidgets pandas
+
+# =========================================
+# STEP 2 — IMPORTS
+# =========================================
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+from selenium.common.exceptions import TimeoutException
+import ipywidgets as widgets
+from IPython.display import display, clear_output
+import time
+import pandas as pd
+
+# =========================================
+# STEP 3 — DRIVER SETUP FUNCTION
+# =========================================
+def setup_driver():
+    """Initialize Selenium Chrome driver (headless)."""
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--window-size=1920,1080")
+
+    driver = webdriver.Chrome(options=chrome_options)
+    wait = WebDriverWait(driver, 15)
+    driver.set_window_size(1920, 1080)
+    return driver, wait
+
+
+# =========================================
+# STEP 4 — SCRAPE FUNCTION
+# =========================================
+def get_vencimentos(driver, wait, url="https://opcoes.net.br/opcoes/bovespa/ABEV3"):
+    """
+    Accesses the provided URL and captures checkbox IDs and labels 
+    from the '#grade-vencimentos-dates' section.
+    Returns two lists: labels (for display) and values (real IDs).
+    """
+    print(f"🔗 Acessando página: {url}")
+    driver.get(url)
+
+    try:
+        wait.until(EC.presence_of_element_located((By.ID, "grade-vencimentos-dates")))
+        time.sleep(2)
+    except TimeoutException:
+        print("⚠️ Timeout ao carregar a página.")
+        return [], []
+
+    container = driver.find_element(By.ID, "grade-vencimentos-dates")
+    checkboxes = container.find_elements(By.TAG_NAME, "input")
+
+    labels, values = [], []
+    for cb in checkboxes:
+        label_id = cb.get_attribute("id")
+        data_du = cb.get_attribute("data-du")
+        if label_id:
+            label_text = f"{label_id} - {data_du} d.u."
+            labels.append(label_text)
+            values.append(label_id)
+
+    print(f"✅ {len(labels)} vencimentos capturados.")
+    return labels, values
+
+
+# =========================================
+# STEP 5 — CREATE MULTISELECT WIDGET
+# =========================================
+def create_multiselect(labels, values):
+    """Creates a MultiSelect widget with vencimento options."""
+    multi = widgets.SelectMultiple(
+        options=list(zip(labels, values)),
+        description="Vencimentos:",
+        style={'description_width': 'initial'},
+        layout=widgets.Layout(width='60%', height='200px')
+    )
+    return multi
+
+
+# =========================================
+# STEP 6 — CONFIRMATION BUTTON
+# =========================================
+def setup_confirm_button(multi_widget):
+    """Creates and binds a button to show selected vencimentos."""
+    button = widgets.Button(
+        description="Confirmar Seleção",
+        button_style="success",
+        tooltip="Clique para confirmar os vencimentos selecionados"
+    )
+
+    output = widgets.Output()
+
+    def on_click(b):
+        with output:
+            clear_output()
+            selected = list(multi_widget.value)
+            if selected:
+                print("✅ Vencimentos selecionados:")
+                for v in selected:
+                    print("-", v)
+            else:
+                print("⚠️ Nenhum vencimento selecionado.")
+
+    button.on_click(on_click)
+    display(multi_widget, button, output)
+
+
+# =========================================
+# STEP 7 — MAIN EXECUTION
+# =========================================
+driver, wait = setup_driver()
+labels, values = get_vencimentos(driver, wait)
+driver.quit()
+
+if labels:
+    multi_widget = create_multiselect(labels, values)
+    setup_confirm_button(multi_widget)
+else:
+    print("❌ Nenhum vencimento encontrado.")
+

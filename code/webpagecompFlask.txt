@@ -1,0 +1,202 @@
+completa do app Flask com UI web
+
+Ao abrir http://localhost:5000, o usuário vê:
+
+Dropdown de ativos (via Selenium IdAcao + “todo”).
+
+Dropdown de vencimentos (vencimentos[3:]).
+
+Input de limite mínimo (threshold).
+
+Botão “Executar Scraper”.
+
+A interface chama o backend Flask, que:
+
+Acessa o site via Selenium.
+
+Filtra opções com min(Bid, Ask) >= threshold.
+
+Retorna os 30 primeiros resultados em tabela HTML.
+
+
+
+%pip install flask selenium pandas tabulate
+
+from flask import Flask, render_template_string, request, jsonify
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait, Select
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
+import pandas as pd
+import time
+from datetime import datetime
+
+# ------------------ Configuração do Selenium ------------------
+chrome_options = Options()
+chrome_options.add_argument("--headless")
+chrome_options.add_argument("--no-sandbox")
+chrome_options.add_argument("--disable-dev-shm-usage")
+driver = webdriver.Chrome(options=chrome_options)
+
+# ------------------ Flask app ------------------
+app = Flask(__name__)
+
+# ------------------ Funções auxiliares ------------------
+def get_ativos():
+    """Obtém lista de ativos disponíveis no seletor."""
+    driver.get("https://opcoes.net.br/opcoes/bovespa/AURE3")
+    try:
+        select_element = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.NAME, "IdAcao"))
+        )
+        select = Select(select_element)
+        options = [opt.text.strip() for opt in select.options if len(opt.text.strip()) > 1]
+        if "todo" not in options:
+            options.insert(0, "todo")
+        return options
+    except Exception as e:
+        print("Erro ao obter ativos:", e)
+        return ["todo"]
+
+def get_vencimentos():
+    """Obtém vencimentos disponíveis."""
+    try:
+        vencimentos = driver.find_elements(By.NAME, "vencimentos")[0]
+        select = Select(vencimentos)
+        vals = [opt.text.strip() for opt in select.options if len(opt.text.strip()) > 1]
+        return vals[3:]
+    except Exception:
+        return []
+
+# ------------------ Scraper simplificado ------------------
+def scrap_data(ativo, threshold, vencimento=None):
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
+
+    print(f"Iniciando scrap para {ativo}, threshold={threshold}, venc={vencimento}")
+    driver.get(f"https://opcoes.net.br/opcoes/bovespa/{ativo}")
+    try:
+        WebDriverWait(driver, 15).until(
+            EC.presence_of_element_located((By.ID, "tblListaOpc_wrapper"))
+        )
+    except TimeoutException:
+        return pd.DataFrame()
+
+    table = driver.find_element(By.ID, "tblListaOpc_wrapper")
+    rows = table.find_elements(By.TAG_NAME, "tr")
+
+    data = []
+    for row in rows:
+        cols = [c.text for c in row.find_elements(By.TAG_NAME, "td")]
+        if len(cols) > 12:
+            try:
+                bid = float(cols[11].replace(",", "."))
+                ask = float(cols[12].replace(",", "."))
+                if min(bid, ask) >= threshold:
+                    data.append({"Ticker": cols[0], "Bid": bid, "Ask": ask})
+            except:
+                continue
+    return pd.DataFrame(data)
+
+# ------------------ HTML da interface ------------------
+html_template = """
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Scraper de Opções B3</title>
+  <style>
+    body { font-family: Arial; margin: 40px; background: #f7f7f7; }
+    h1 { color: #222; }
+    select, input, button { padding: 8px; margin: 8px 0; font-size: 15px; }
+    #result { margin-top: 30px; background: white; padding: 20px; border-radius: 10px; }
+  </style>
+</head>
+<body>
+  <h1>📊 Web Scraper B3 (Opções)</h1>
+
+  <label>Ativo:</label>
+  <select id="ativo"></select><br>
+
+  <label>Vencimento:</label>
+  <select id="vencimento"></select><br>
+
+  <label>Valor mínimo Bid/Ask:</label>
+  <input type="number" id="threshold" step="0.01" value="0.05"><br>
+
+  <button onclick="executar()">Executar Scraper</button>
+
+  <div id="result"></div>
+
+  <script>
+    async function carregarDados() {
+      let resp = await fetch('/load_options');
+      let data = await resp.json();
+      let ativoSel = document.getElementById('ativo');
+      let vencSel = document.getElementById('vencimento');
+
+      data.ativos.forEach(opt => {
+        let o = document.createElement('option');
+        o.text = opt; o.value = opt;
+        ativoSel.appendChild(o);
+      });
+
+      data.vencimentos.forEach(v => {
+        let o = document.createElement('option');
+        o.text = v; o.value = v;
+        vencSel.appendChild(o);
+      });
+    }
+
+    async function executar() {
+      const ativo = document.getElementById('ativo').value;
+      const venc = document.getElementById('vencimento').value;
+      const threshold = parseFloat(document.getElementById('threshold').value);
+      document.getElementById('result').innerHTML = "⏳ Executando...";
+
+      let resp = await fetch('/run_scraper', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ativo, threshold, venc })
+      });
+      let html = await resp.text();
+      document.getElementById('result').innerHTML = html;
+    }
+
+    carregarDados();
+  </script>
+</body>
+</html>
+"""
+
+# ------------------ Rotas Flask ------------------
+@app.route('/')
+def index():
+    return render_template_string(html_template)
+
+@app.route('/load_options')
+def load_options():
+    ativos = get_ativos()
+    vencimentos = get_vencimentos()
+    return jsonify({"ativos": ativos, "vencimentos": vencimentos})
+
+@app.route('/run_scraper', methods=['POST'])
+def run_scraper():
+    data = request.get_json()
+    ativo = data.get("ativo")
+    threshold = float(data.get("threshold", 0))
+    venc = data.get("venc")
+
+    df = scrap_data(ativo, threshold, venc)
+    if df.empty:
+        return "<p>⚠️ Nenhum resultado encontrado.</p>"
+    return df.head(30).to_html(index=False)
+
+# ------------------ Inicialização ------------------
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
+
+
+

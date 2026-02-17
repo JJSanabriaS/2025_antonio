@@ -1,0 +1,241 @@
+# ============================================
+# STEP 1 — INSTALL DEPENDENCIES
+# ============================================
+!apt-get update -qq
+!apt-get install -qq chromium-chromedriver
+!pip install -q selenium tabulate ipywidgets pillow pandas requests
+
+# ============================================
+# STEP 2 — IMPORTS
+# ============================================
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait, Select
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
+from PIL import Image
+from google.colab import files
+import pandas as pd
+import requests
+import time
+from tabulate import tabulate
+from datetime import datetime
+from IPython.display import display, clear_output
+import ipywidgets as widgets
+
+# ============================================
+# STEP 3 — CONFIGURAÇÃO DO DRIVER
+# ============================================
+chrome_options = Options()
+chrome_options.add_argument("--headless")  # mantenha False se quiser ver o navegador
+chrome_options.add_argument("--no-sandbox")
+chrome_options.add_argument("--disable-dev-shm-usage")
+chrome_options.add_argument("--window-size=1920,1080")
+
+driver = webdriver.Chrome(options=chrome_options)
+wait = WebDriverWait(driver, 15)
+print("✅ Driver iniciado com sucesso.")
+
+
+# ============================================
+# STEP 4 — FUNÇÕES AUXILIARES
+# ============================================
+def get_vencimentos(driver, wait, url="https://opcoes.net.br/opcoes/bovespa/ABEV3"):
+    """Obtém os vencimentos disponíveis (labels e IDs)."""
+    print(f"🔗 Acessando página: {url}")
+    driver.get(url)
+    try:
+        wait.until(EC.presence_of_element_located((By.ID, "grade-vencimentos-dates")))
+        time.sleep(2)
+    except TimeoutException:
+        print("⚠️ Timeout ao carregar a página.")
+        return [], []
+
+    container = driver.find_element(By.ID, "grade-vencimentos-dates")
+    checkboxes = container.find_elements(By.TAG_NAME, "input")
+
+    labels, values = [], []
+    for cb in checkboxes:
+        label_id = cb.get_attribute("id")
+        data_du = cb.get_attribute("data-du")
+        if label_id:
+            label_text = f"{label_id} - {data_du} d.u."
+            labels.append(label_text)
+            values.append(label_id)
+
+    print(f"✅ {len(labels)} vencimentos capturados.")
+    return labels, values
+
+
+def atualizar_vencimentos_por_indice(driver, wait, labels, values):
+    """
+    Exibe vencimentos numerados, pede escolha, limpa todos os checkboxes
+    e marca apenas o selecionado.
+    """
+    print("\n📅 Lista de vencimentos disponíveis:")
+    for i, label in enumerate(labels):
+        print(f"[{i}] {label}")
+
+    try:
+        idx = int(input("\nDigite o número do vencimento desejado (ou -1 para cancelar): "))
+    except ValueError:
+        print("⚠️ Entrada inválida.")
+        return False
+
+    if idx == -1:
+        print("🚫 Operação cancelada.")
+        return False
+
+    if idx < 0 or idx >= len(values):
+        print("⚠️ Índice fora do intervalo.")
+        return False
+
+    vencimento_id = values[idx]
+    print(f"\n🟦 Selecionando vencimento: {labels[idx]}")
+
+    try:
+        wait.until(EC.presence_of_element_located((By.ID, "grade-vencimentos-dates")))
+        container = driver.find_element(By.ID, "grade-vencimentos-dates")
+        checkboxes = container.find_elements(By.TAG_NAME, "input")
+
+        # Limpa checkboxes
+        for cb in checkboxes:
+            if cb.is_selected():
+                driver.execute_script("arguments[0].click();", cb)
+        print("✅ Todos os checkboxes foram desmarcados.")
+
+        # Marca o escolhido
+        alvo = next((cb for cb in checkboxes if cb.get_attribute("id") == vencimento_id), None)
+        if alvo:
+            driver.execute_script("arguments[0].click();", alvo)
+            print(f"✅ Vencimento '{labels[idx]}' foi selecionado.")
+        else:
+            print(f"⚠️ Checkbox '{vencimento_id}' não encontrado.")
+
+        # Aguarda atualização
+        try:
+            WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.ID, "tblListaOpc_wrapper"))
+            )
+            print("🔄 Página atualizada conforme o vencimento escolhido.")
+        except TimeoutException:
+            print("⚠️ Timeout esperando atualização da tabela.")
+
+        return True
+    except Exception as e:
+        print(f"❌ Erro ao atualizar vencimentos: {e}")
+        return False
+
+
+def ajuste(url2, tiker, val_mom, strike, bid, ask):
+    try:
+        return (float(strike) - float(val_mom)) + (float(bid) - float(ask)) / (float(val_mom) + float(ask))
+    except Exception:
+        return 0.0
+
+
+def armazem(df, name):
+    df.to_csv(name + ".csv", index=False)
+    df.to_excel(name + ".xlsx", index=False)
+    files.download(name + ".csv")
+    files.download(name + ".xlsx")
+    return df
+
+
+def cadeiastring(i, datascall, datasput):
+    try:
+        strike = datascall[4] if len(datascall) > 26 else datascall[3]
+        bid = datascall[11] or "0.0"
+        ask = datasput[12] or "0.0"
+        strike = strike.replace(".", "").replace(",", ".")
+        bid = bid.replace(".", "").replace(",", ".")
+        ask = ask.replace(".", "").replace(",", ".")
+        return float(strike), float(bid), float(ask)
+    except Exception:
+        return 0.0, 0.0, 0.0
+
+
+def extradados(table_container):
+    retries = 3
+    for attempt in range(retries):
+        try:
+            rows = table_container.find_elements(By.TAG_NAME, "tr")
+            return [[cell.text for cell in row.find_elements(By.TAG_NAME, "td")] for row in rows]
+        except StaleElementReferenceException:
+            time.sleep(1)
+    return []
+
+
+def prinp(url2):
+    print(f"\n==== Iniciando {url2} ====")
+    url = f"https://opcoes.net.br/opcoes/bovespa/{url2}"
+    driver.get(url)
+
+    try:
+        table2 = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.ID, "divCotacaoAtual"))
+        )
+        cotiz = table2.text.split()
+        val_mom = float(cotiz[1].replace(".", "").replace(",", "."))
+    except Exception:
+        val_mom = 0.0
+
+    try:
+        table_container = WebDriverWait(driver, 15).until(
+            EC.presence_of_element_located((By.ID, "tblListaOpc_wrapper"))
+        )
+    except TimeoutException:
+        print("⚠️ Tabela não carregou.")
+        return pd.DataFrame()
+
+    table_data = extradados(table_container)
+    if not table_data:
+        return pd.DataFrame()
+
+    resumo_list = []
+    for i in range(3, len(table_data), 2):
+        if i + 1 >= len(table_data):
+            break
+        strike, bid, ask = cadeiastring(i, table_data[i], table_data[i + 1])
+        formula = ajuste(url2, table_data[i][0] if table_data[i] else "N/A", val_mom, strike, bid, ask)
+        resumo_list.append({
+            "Ativo": url2,
+            "Ticker": table_data[i][0] if table_data[i] else "N/A",
+            "ValMom": val_mom,
+            "Strike": strike,
+            "Bid": bid,
+            "Ask": ask,
+            "Formula": formula
+        })
+
+    return pd.DataFrame(resumo_list)
+
+
+# ============================================
+# STEP 5 — EXECUÇÃO PRINCIPAL
+# ============================================
+url = "https://opcoes.net.br/opcoes/bovespa/PETR4"
+driver.get(url)
+
+# Captura vencimentos e deixa usuário escolher um
+labels, values = get_vencimentos(driver, wait, url)
+sucesso = atualizar_vencimentos_por_indice(driver, wait, labels, values)
+
+# Continua com scraping e salvamento
+if sucesso:
+    final_df = prinp("ABEV3")
+    if not final_df.empty:
+        display(final_df)
+        armazem(final_df, "full")
+        top30 = final_df.sort_values(by="Formula", ascending=False).head(30)
+        display(top30)
+        armazem(top30, "top30")
+    else:
+        print("⚠️ Nenhum dado retornado.")
+else:
+    print("🚫 Nenhuma atualização realizada.")
+
+driver.quit()
+print("✅ Execução finalizada.")
+

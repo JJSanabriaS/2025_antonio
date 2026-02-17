@@ -1,0 +1,191 @@
+#strutura app/
+#├── app.py               # código principal (Flask)
+#├── templates/
+#│   └── index.html       # interface web (frontend)
+#├── static/
+#│   └── style.css        # estilos (opcional)
+#├── requirements.txt     # dependências
+#└── Dockerfile           # para deploy em qualquer servidor
+
+app;py
+from flask import Flask, render_template, request, send_file, redirect, url_for
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait, Select
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException, StaleElementReferenceException
+import pandas as pd
+from datetime import datetime
+import time
+import io
+
+app = Flask(__name__)
+
+# ============================================
+# CONFIGURAÇÃO DO SELENIUM
+# ============================================
+chrome_options = Options()
+chrome_options.add_argument("--headless")
+chrome_options.add_argument("--no-sandbox")
+chrome_options.add_argument("--disable-dev-shm-usage")
+chrome_options.add_argument("--window-size=1920,1080")
+driver = webdriver.Chrome(options=chrome_options)
+wait = WebDriverWait(driver, 15)
+
+# ============================================
+# FUNÇÕES AUXILIARES
+# ============================================
+def get_vencimentos(url="https://opcoes.net.br/opcoes/bovespa/ABEV3"):
+    driver.get(url)
+    wait.until(EC.presence_of_element_located((By.ID, "grade-vencimentos-dates")))
+    container = driver.find_element(By.ID, "grade-vencimentos-dates")
+    checkboxes = container.find_elements(By.TAG_NAME, "input")
+
+    labels, values = [], []
+    for cb in checkboxes:
+        label_id = cb.get_attribute("id")
+        data_du = cb.get_attribute("data-du")
+        if label_id:
+            labels.append(f"{label_id} - {data_du} d.u.")
+            values.append(label_id)
+    return labels, values
+
+def ajuste(tiker, val_mom, strike, bid, ask):
+    try:
+        return (float(strike) - float(val_mom)) + (float(bid) - float(ask)) / (float(val_mom) + float(ask))
+    except Exception:
+        return 0.0
+
+def prinp(ativo):
+    url = f"https://opcoes.net.br/opcoes/bovespa/{ativo}"
+    driver.get(url)
+    try:
+        table2 = wait.until(EC.presence_of_element_located((By.ID, "divCotacaoAtual")))
+        cotiz = table2.text.split()
+        val_mom = float(cotiz[1].replace(".", "").replace(",", "."))
+    except:
+        val_mom = 0.0
+
+    try:
+        table = wait.until(EC.presence_of_element_located((By.ID, "tblListaOpc_wrapper")))
+    except TimeoutException:
+        return pd.DataFrame()
+
+    rows = table.find_elements(By.TAG_NAME, "tr")
+    data = [[cell.text for cell in r.find_elements(By.TAG_NAME, "td")] for r in rows]
+    resumo = []
+
+    for i in range(3, len(data), 2):
+        if i + 1 >= len(data): break
+        try:
+            strike = float(data[i][4].replace(".", "").replace(",", "."))
+            bid = float(data[i][11].replace(".", "").replace(",", "."))
+            ask = float(data[i+1][12].replace(".", "").replace(",", "."))
+            formula = ajuste(ativo, val_mom, strike, bid, ask)
+            resumo.append({
+                "Ativo": ativo, "Strike": strike, "Bid": bid, "Ask": ask,
+                "Formula": formula, "ValMom": val_mom
+            })
+        except:
+            continue
+
+    return pd.DataFrame(resumo)
+
+# ============================================
+# ROTAS FLASK
+# ============================================
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/run', methods=['POST'])
+def run_scraper():
+    ativo = request.form.get("ativo")
+    if not ativo:
+        return redirect(url_for("index"))
+
+    df = prinp(ativo)
+    if df.empty:
+        return "Nenhum dado encontrado."
+
+    # Salvar em memória
+    csv_buffer = io.StringIO()
+    df.to_csv(csv_buffer, index=False)
+    csv_buffer.seek(0)
+
+    session_data[ativo] = csv_buffer.getvalue()
+    return render_template("index.html", tables=[df.to_html(classes='table table-striped', index=False)], ativo=ativo)
+
+@app.route('/download/<ativo>')
+def download(ativo):
+    csv_data = session_data.get(ativo)
+    if not csv_data:
+        return "Arquivo não encontrado."
+    return send_file(io.BytesIO(csv_data.encode('utf-8')), as_attachment=True, download_name=f"{ativo}.csv")
+
+session_data = {}
+
+# ============================================
+# MAIN
+# ============================================
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8080, debug=False)
+
+templates/index.html
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Scraper de Opções Bovespa</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+<div class="container py-4">
+  <h2 class="mb-4">📊 Scraper de Opções Bovespa</h2>
+  <form method="post" action="/run">
+    <div class="mb-3">
+      <label for="ativo" class="form-label">Ativo</label>
+      <input type="text" name="ativo" id="ativo" class="form-control" placeholder="Ex: PETR4, ABEV3, VALE3">
+    </div>
+    <button type="submit" class="btn btn-primary">Executar Scraper</button>
+  </form>
+
+  {% if tables %}
+    <hr>
+    <h4>Resultados de {{ ativo }}</h4>
+    {{ tables|safe }}
+    <a href="/download/{{ ativo }}" class="btn btn-success mt-3">⬇️ Download CSV</a>
+  {% endif %}
+</div>
+</body>
+</html>
+
+requirements.txt
+flask
+selenium
+pandas
+gunicorn
+
+Dockerfile (para deploy externo)
+FROM python:3.11-slim
+WORKDIR /app
+COPY . .
+RUN pip install -r requirements.txt
+EXPOSE 8080
+CMD ["gunicorn", "-b", "0.0.0.0:8080", "app:app"]
+
+rodar localmente
+pip install -r requirements.txt
+python app.py
+
+Como hospedar
+Você pode subir esse app em qualquer servidor que aceite Python + Docker, por exemplo:
+
+Railway.app
+
+Google Cloud Run
+
+Vercel (via Docker)
+
+AWS ECS ou EC2

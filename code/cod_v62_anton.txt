@@ -1,0 +1,85 @@
+# ==============================================
+# Interface Interativa p/ Web Scraping no Jupyter
+# ==============================================
+
+!pip install -q ipywidgets
+from IPython.display import display, HTML
+import ipywidgets as widgets
+from selenium.webdriver.support.ui import Select
+import time
+import pandas as pd
+
+# -------- Função para obter dropdowns ----------
+def get_dropdown_data(url="https://opcoes.net.br/opcoes/bovespa/IBOV11"):
+    """Coleta opções de ativos e vencimentos da página."""
+    driver.get(url)
+    time.sleep(3)
+
+    # Dropdown 1: ativos (IdAcao)
+    select_element = driver.find_element(By.NAME, "IdAcao")
+    select = Select(select_element)
+    ativos = [opt.text.strip() for opt in select.options if len(opt.text.strip()) > 0]
+    ativos = ["todas"] + ativos  # adiciona opção especial
+
+    # Dropdown 2: vencimentos (inputs id)
+    ids = driver.find_elements(By.TAG_NAME, "input")
+    vencimentos = [ii.get_attribute('id') for ii in ids if ii.get_attribute('id')]
+    vencimentos = vencimentos[3:]  # ignora os 3 primeiros conforme seu scraper
+
+    return ativos, vencimentos
+
+# -------- UI principal ----------
+ativos, vencimentos = get_dropdown_data()
+
+ativo_dd = widgets.Dropdown(
+    options=ativos,
+    description="Ativo:",
+    layout=widgets.Layout(width="60%")
+)
+
+venc_dd = widgets.Dropdown(
+    options=vencimentos,
+    description="Vencimento:",
+    layout=widgets.Layout(width="60%")
+)
+
+btn = widgets.Button(
+    description="🚀 Executar Scraper",
+    button_style='success',
+    layout=widgets.Layout(width="40%")
+)
+output = widgets.Output()
+
+# -------- Função de execução ----------
+def on_click_run(b):
+    output.clear_output()
+    with output:
+        ativo = ativo_dd.value
+        venc = venc_dd.value
+        print(f"\n🔍 Iniciando scraping para Ativo: {ativo} | Vencimento: {venc}\n")
+        try:
+            if ativo == "todas":
+                df = get_sel(driver)  # chama scraping total
+            else:
+                df = prinp(ativo)  # scraping individual
+            if isinstance(df, pd.DataFrame):
+                display(df.head(10))
+                df.to_excel("resultado_scraper.xlsx", index=False)
+                print("💾 Resultado salvo como resultado_scraper.xlsx")
+            else:
+                print("Nenhum DataFrame retornado.")
+        except Exception as e:
+            print("❌ Erro durante scraping:", e)
+
+btn.on_click(on_click_run)
+
+# -------- Exibir interface ----------
+display(
+    widgets.VBox([
+        widgets.HTML("<h3>🌐 Web Scraper Interativo — Opções B3</h3>"),
+        widgets.HBox([ativo_dd, venc_dd]),
+        btn,
+        output
+    ])
+)
+

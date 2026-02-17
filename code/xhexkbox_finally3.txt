@@ -1,0 +1,108 @@
+# =========================================
+# STEP 1 — INSTALL DEPENDENCIES
+# =========================================
+!apt-get update -qq
+!apt-get install -qq chromium-chromedriver
+!pip install -q selenium tabulate ipywidgets pillow pandas requests
+
+# =========================================
+# STEP 2 — IMPORTS
+# =========================================
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+from IPython.display import display, clear_output
+import ipywidgets as widgets
+import requests
+import pandas as pd
+
+# =========================================
+# STEP 3 — SELENIUM SETUP
+# =========================================
+chrome_options = Options()
+chrome_options.add_argument("--headless")
+chrome_options.add_argument("--no-sandbox")
+chrome_options.add_argument("--disable-dev-shm-usage")
+chrome_options.add_argument("--window-size=1920,1080")
+
+
+driver = webdriver.Chrome(options=chrome_options)
+wait = WebDriverWait(driver, timeout=10)
+driver.set_window_size(1920, 1080)  # Full HD size
+# =========================================
+# STEP 4 — SCRAPER FUNCTION
+# =========================================
+def prinp():
+    url = "https://opcoes.net.br/opcoes/bovespa/AMBP3"
+    driver.get(url)
+    vencimentos = driver.find_element(By.ID, "grade-vencimentos-dates")
+    # Use WebDriverWait to wait for the checkbox to be clickable
+    # Changed the locator to be more specific if possible, targeting the checkbox within the vencimentos element
+    checkbox = wait.until(EC.presence_of_element_located((By.XPATH, "//div[@id='grade-vencimentos-dates']//input[@type='checkbox']")))
+    #print("grade tipo")
+    #print(vencimentos.text)
+    ids = driver.find_elements(By.TAG_NAME,"input")
+    vencimentos=[]
+    datas=[]
+    data_du=[]
+    mix=[]
+    for ii in ids:
+        #print ii.tag_name
+        #print (ii.get_attribute('id'))    # id name as string
+        datas.append(ii.get_attribute('id'))
+        data_du.append(ii.get_attribute('data-du'))
+        #print("label    ",ii.get_attribute('label'))
+        #print("value   ",ii.get_attribute('value'))
+        #print("data-du   ",ii.get_attribute('data-du'))
+        vencimentos.append(ii.get_attribute('selected'))
+        mix.append(str(ii.get_attribute('id'))+"  - "+str(ii.get_attribute('data-du'))+" "+" d.u.")
+        #print(str(ii.get_attribute('id'))+"  - "+str(ii.get_attribute('data-du'))+" "+" d.u.")
+
+
+        #if id_val :
+        #    datas.append(id_val)
+    #print(f"✅ Found {len(datas)} vencimentos.")
+    box=len(datas)-5
+    #print(datas[0:3])
+    #print(vencimentos[0:3])
+   # print("labels  ", datas[3:box])
+    datas2=datas[3:box]
+    datas=mix[3:box]
+    #print(datas)
+    #print (data_du[3:box]+"d.u.")
+    return datas,datas2
+
+[datas,datas2]= prinp()
+
+# =========================================
+# STEP 5 — DROPDOWN CREATION
+# =========================================
+# Create list of (label, value) pairs
+options = list(zip(datas, datas2))
+
+# Create a dictionary with values as keys and labels as values for easy lookup
+options_dict = dict(zip(datas2, datas))
+
+# Define the dropdown widget
+dropdown_vencimentos = widgets.Dropdown(
+    options=options,
+    description='Vencimento:',
+    style={'description_width': 'initial'},
+    layout=widgets.Layout(width='50%')
+)
+
+# Display the dropdown
+display(dropdown_vencimentos)
+
+# Optional: Show which real value was selected
+def on_change(change):
+    if change['type'] == 'change' and change['name'] == 'value':
+        clear_output(wait=True)
+        display(dropdown_vencimentos)
+        # Use the options_dict to get the label from the selected value
+        print(f"🔹 Label shown: {options_dict[change['new']]}")
+        print(f"🔸 Actual value: {change['new']}")
+
+dropdown_vencimentos.observe(on_change)

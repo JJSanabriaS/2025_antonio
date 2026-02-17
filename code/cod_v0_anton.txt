@@ -1,0 +1,66 @@
+
+prazer jairo sanabria
+entao o colab e um sistema online onde e possivel testar codigos sem muita enrolacao e bem facil..vamos fazer juntos no video ...
+
+johnjairos@gmail.com
+zap 21991780466
+
+sem mais delongas..
+
+
+pip install selenium
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+from PIL import Image
+from IPython.display import display
+from google.colab import files
+import requests
+# Configure Chrome options for headless mode
+chrome_options = Options()
+chrome_options.add_argument("--headless")
+chrome_options.add_argument("--no-sandbox")
+chrome_options.add_argument("--disable-dev-shm-usage")
+# Initialize the WebDriver (e.g., Chrome) with the configured options
+driver = webdriver.Chrome(options=chrome_options)
+
+
+# Navigate to the webpage containing the div-based table
+url="https://opcoes.net.br/opcoes/bovespa/ALOS3"
+
+driver.get(url) # Replace with the actual URL
+response = requests.get(url)
+text_content = response.text
+print(text_content)
+
+# Wait for the table element to be present (adjust locator as needed)
+# This assumes the main table div has a specific class, e.g., 'table-container'
+
+
+# Find all "row" divs within the table container
+# Assuming rows have a class like 'table-row'
+#rows = table_container.find_elements(By.CLASS_NAME, "data-row")
+
+table=driver.find_element(By.ID,"divMinMax")
+print(table.text)
+#display.Image(b64decode(table.screenshot_as_png))
+#display(Image(table.screenshot_as_png, width=200, height=100))
+#my_image=table.screenshot_as_png
+#display.Image(b64decode(base64_data))
+#files.download(my_image)
+
+
+# Close the browser
+driver.quit()
+
+
+Segue a imagem. Você vai usar todas essas informações. Lembrando:
+1 - Quando for definir o intervalo de strikes vai pegar o intervalor máximo.
+2 - O excel deve permitir eu definir o vencimento, que também circulei na imagem.
+3 - Essa imagem você só consegue obter durante o pregão.
+4 - Perceba que existe colunas chamadas Qtd. Bid e Qtd. Ask. Essas colunas serão importantes para eu filtrar pelo volume.
+Por exemplo que posso querer fazer a operação somente se tiver pelo menos 500 papei a disposição. Então deve haver pelo menos 500 papéis disponiveis entre essas colunas e a ação em si. 
+
+

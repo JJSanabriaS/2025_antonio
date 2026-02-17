@@ -1,0 +1,282 @@
+%pip install -q selenium
+%pip install -q tabulate
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+from PIL import Image
+from IPython.display import display
+from google.colab import files
+import requests
+from selenium.webdriver.support.ui import Select
+from tabulate import tabulate
+import pandas as pd
+
+
+# Configure Chrome options for headless mode
+chrome_options = Options()
+chrome_options.add_argument("--headless")
+chrome_options.add_argument("--no-sandbox")
+chrome_options.add_argument("--disable-dev-shm-usage")
+# Initialize the WebDriver (e.g., Chrome) with the configured options
+driver = webdriver.Chrome(options=chrome_options)
+#wait = WebDriverWait(driver, timeout=2)
+#wait.until(lambda _ : revealed.is_displayed())
+
+
+#<select name="IdAcao"><option></option><option value="ABEV3">ABEV3</option><option value="ALOS3">ALOS3</option><option value="AMBP3">AMBP3</option><option value="ASAI3">ASAI3</option><option value="AURE3">AURE3</option><option value="AZUL4">AZUL4</option><option value="AZZA3">AZZA3</option><option value="B3SA3">B3SA3</option><option value="BBAS3">BBAS3</option><option value="BBDC3">BBDC3</option><option value="BBDC4">BBDC4</option><option value="BBSE3">BBSE3</option><option value="BEEF3">BEEF3</option><option value="BHIA3">BHIA3</option><option value="BOVA11">BOVA11</option><option value="BOVV11">BOVV11</option><option value="BPAC11">BPAC11</option><option value="BPAN4">BPAN4</option><option value="BRAP4">BRAP4</option><option value="BRAV3">BRAV3</option><option value="BRKM5">BRKM5</option><option value="BRSR6">BRSR6</option><option value="CASH3">CASH3</option><option value="CBAV3">CBAV3</option><option value="CMIG4">CMIG4</option><option value="CMIN3">CMIN3</option><option value="COGN3">COGN3</option><option value="CPLE6">CPLE6</option><option value="CSAN3">CSAN3</option><option value="CSMG3">CSMG3</option><option value="CSNA3">CSNA3</option><option value="CVCB3">CVCB3</option><option value="CXSE3">CXSE3</option><option value="CYRE3">CYRE3</option><option value="DIRR3">DIRR3</option><option value="EGIE3">EGIE3</option><option value="ELET3">ELET3</option><option value="ELET6">ELET6</option><option value="EMBR3">EMBR3</option><option value="ENEV3">ENEV3</option><option value="ENGI11">ENGI11</option><option value="EQTL3">EQTL3</option><option value="EZTC3">EZTC3</option><option value="FLRY3">FLRY3</option><option value="GGBR4">GGBR4</option><option value="GOAU4">GOAU4</option><option value="HAPV3">HAPV3</option><option value="HYPE3">HYPE3</option><option value="IBOV11">IBOV11</option><option value="IGTI11">IGTI11</option><option value="IRBR3">IRBR3</option><option value="ISAE4">ISAE4</option><option value="ITSA4">ITSA4</option><option value="ITUB4">ITUB4</option><option value="JBSS32">JBSS32</option><option value="JHSF3">JHSF3</option><option value="KEPL3">KEPL3</option><option value="KLBN11">KLBN11</option><option value="LJQQ3">LJQQ3</option><option value="LREN3">LREN3</option><option value="LWSA3">LWSA3</option><option value="MBRF3">MBRF3</option><option value="MGLU3">MGLU3</option><option value="MOVI3">MOVI3</option><option value="MRVE3">MRVE3</option><option value="MULT3">MULT3</option><option value="MYPK3">MYPK3</option><option value="NATU3">NATU3</option><option value="PCAR3">PCAR3</option><option value="PETR3">PETR3</option><option value="PETR4">PETR4</option><option value="PETZ3">PETZ3</option><option value="POMO4">POMO4</option><option value="PRIO3">PRIO3</option><option value="PSSA3">PSSA3</option><option value="RADL3">RADL3</option><option value="RAIL3">RAIL3</option><option value="RAIZ4">RAIZ4</option><option value="RANI3">RANI3</option><option value="RAPT4">RAPT4</option><option value="RDOR3">RDOR3</option><option value="RECV3">RECV3</option><option value="RENT3">RENT3</option><option value="SANB11">SANB11</option><option value="SBSP3">SBSP3</option><option value="SIMH3">SIMH3</option><option value="SMAL11">SMAL11</option><option value="SMTO3">SMTO3</option><option value="SUZB3">SUZB3</option><option value="TAEE11">TAEE11</option><option value="TOTS3">TOTS3</option><option value="UGPA3">UGPA3</option><option value="USIM5">USIM5</option><option value="VALE3" selected="selected">VALE3</option><option value="VAMO3">VAMO3</option><option value="VBBR3">VBBR3</option><option value="VIVA3">VIVA3</option><option value="WEGE3">WEGE3</option><option value="YDUQ3">YDUQ3</option></select>
+
+url="https://opcoes.net.br/opcoes/bovespa"
+driver.get(url) # Replace with the actual URL
+#response = requests.get(url)
+#text_content = response.text
+#print(text_content)
+select_element = driver.find_element(By.NAME, "IdAcao")
+select = Select(select_element)
+all_option_texts = []
+for option in select.options:
+  all_option_texts.append(option.text)
+  #print("All option texts:", all_option_texts)
+
+print(len(all_option_texts))
+print(type(all_option_texts))
+print(all_option_texts[5])
+#print(all_option_texts
+print(table)
+
+# Navigate to the webpage containing the div-based table
+url="https://opcoes.net.br/opcoes/bovespa/VALE3"
+
+driver.get(url) # Replace with the actual URL
+response = requests.get(url)
+text_content = response.text
+#print(text_content)
+
+# Wait for the table element to be present (adjust locator as needed)
+# This assumes the main table div has a specific class, e.g., 'table-container'
+url_list = url.split('/')
+#print(len(url_list))
+#print(url_list)
+print("papel:  "+url_list[len(url_list)-1])
+
+
+print("\n")
+table=driver.find_element(By.ID,"divMinMax")
+print("valores maximos")
+print(table.text)
+print("\n")
+print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+table2=driver.find_element(By.ID,"divCotacaoAtual")
+print("cotacao atual")
+print(table2.text)
+cotiz = table2.text
+cotiz_list = cotiz.split(' ')
+print(cotiz_list)
+#print(cotiz_list[1])
+val_mom=cotiz_list[1]
+val_mom=float(val_mom.replace(",","."))
+print("val no momento  ",val_mom)
+print("\n")
+print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+
+vencimentos = driver.find_element(By.ID, "grade-vencimentos-dates")
+print("grade tipo")
+print(vencimentos.text)
+ids = driver.find_elements(By.TAG_NAME,"input")
+vencimentos=[]
+datas=[]
+for ii in ids:
+    #print ii.tag_name
+    #print (ii.get_attribute('id'))    # id name as string
+    datas.append(ii.get_attribute('id'))
+    vencimentos.append(ii.get_attribute('selected'))
+
+#print(datas)
+#print(vencimentos)
+
+
+print(datas[0:3])
+print(vencimentos[0:3])
+print(datas[3:])
+print(vencimentos[3:])
+print("\n")
+
+
+table2=driver.find_element(By.ID,"strike-range")
+print("range strike")
+print(table2.text)
+print("+++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+print("\n")
+#table3=driver.find_element(By.ID,"tblListaOpc_wrapper")
+#table3=driver.find_element(By.CLASS_NAME,"dt-column-title")
+
+
+
+print("tabla entera busca titulos")
+#print(table3.text)
+
+#table4=driver.find_element(By.CLASS_NAME,"dt-column-title")
+#print(table4.text)
+
+# Wait for the table to be loaded
+wait = WebDriverWait(driver, 10)
+table_container = wait.until(EC.presence_of_element_located((By.ID, "tblListaOpc_wrapper")))
+
+table_data = []
+
+#table4=table_container.find_elements(By.CLASS_NAME,"dt-column-title")
+#print(table4)
+#print(len(table4))
+#separator = " "
+#my_string = separator.join(table4)
+#print(my_string)
+
+#theader = table_container.find_elements(By.ID , "data-dt-column")
+#print("   cabecero  ")
+#print(theader)
+#Message: stale element reference: stale element not found in the current frame
+header=[]
+rows = table_container.find_elements(By.TAG_NAME, "tr")
+for row in rows:
+  row_data = []
+  headers = row.find_elements(By.TAG_NAME, "th") # Or "th" for header cells
+  for cell in headers:
+    #print(cell.text)
+    header.append(cell.text) # Get the visible text of the cell
+  #table_data.append(row_data)
+
+#print("datos header")
+#print(len(header))
+half=int(0.5*len(header))
+#print(header[0:half])
+#print(int(header.index('')))
+del header[int(header.index('')):(half)]
+#print(0.5*len(header))
+header1=header[0:int(header.index('Núm. de Neg.'))]
+#naodee=header[int(header.index('Núm. de Neg.'
+#header2=header1.join(naodee)
+#print("ccortado ")
+#print(header)
+#print(len(header))
+naodee=["Vol. Financeiro","Vol. Impl. (%)","Delta","Gamma", "Theta ($)", "Theta (%)","Vega",	"IQ","Coberto","Travado","Descob.","Tit.","Lanç."]
+#print(naodee)
+header2=header1+naodee
+#print(header2)
+#<th class="dt-body-right dt-type-numeric dt-orderable-asc dt-orderable-desc" data-dt-column="2" rowspan="2" colspan="1"><span class="dt-column-title">Dias úteis</span><span class="dt-column-order" role="button" aria-label="Dias úteis: Activate to sort" tabindex="0"></span></th>
+print("\n")
+print("===============================================")
+print("     datos ")
+table_data.append(header2)
+# Re-find rows inside the loop to avoid StaleElementReferenceException
+rows = table_container.find_elements(By.TAG_NAME, "tr")
+for row in rows:
+  row_data = []
+  xont=0
+  cells = row.find_elements(By.TAG_NAME, "td") # Or "th" for header cells
+  for cell in cells:
+    if len(cell.text)>0:
+      row_data.append(cell.text) # Get the visible text of the cell
+    xont=xont+1
+  table_data.append(row_data)
+
+print(xont)
+
+#df_data = pd.DataFrame(table_data)
+#df = pd.DataFrame(header2)
+#dft=pd.concat([df, df_data],axis=0)
+
+
+table_data= [0 if item == "" or item is None else item for item in table_data]
+
+print("\n")
+print("***********************************************")
+print('table')
+#print(table_data)
+#print("\n")
+print("***********************************************")
+#print(dft)
+#print(tabulate(table_data))
+# 24 vlores offline
+#StaleElementReferenceException: Message: stale element reference: stale element not found in the current frame
+#(Valor de Strike - Valor da ação no momento) +
+#(preço de venda da call no strike - preço de compra da put no strike)/( Valor da ação no momento + preço de compra da put no strike)
+#display.Image(b64decode(table.screenshot_as_png))
+#display(Image(table.screenshot_as_png, width=200, height=100))
+#my_image=table.screenshot_as_png
+#display.Image(b64decode(base64_data))
+#files.download(my_image)
+#print(type(table_data))
+#print(table_data[0]) #header
+#print(table_data[1])
+#print(len(table_data[1]))
+#print(table_data[2])
+#print(table_data[3])
+#print(table_data[4])
+#print(table_data[5])
+#print(len(table_data[5]))
+#print('filtred')
+filtered_list = list(filter(None, table_data)) # None acts as a filter for "falsy" values
+#print(filtered_list)
+print(tabulate(filtered_list))
+#print(type(table_data[10]))
+#print(len(table_data[10]))
+#print(table_data[10][4])
+#print(table_data[10][9])
+datas=filtered_list
+#print(datas[2:])
+for i in range(int(xont*0.5)):
+    if i % 2 == 0:
+      if (len(datas[i+1]))>23:
+        #3 for offline 4 for realtime
+        strike=(datas[i+1][4])
+      else:
+        strike=(datas[i+1][3])
+
+      bid=(datas[i+1][11])
+      ask=(datas[i+2][12])
+      #valmom=float(59.20)
+      #strike="2,3"
+      #bid='34'
+      #ask="0,0"
+      strike = float(strike.replace(",", "."))
+      bid=float(bid.replace(",", "."))
+      ask=float(ask.replace(",", "."))
+      #print(type(strike), strike)
+      #print(type(bid), bid)
+      #print(type(ask), ask)
+      #strike=float(strike)
+      #bid=float(bid)
+      #ask=float(ask)
+      #print('fatores formula antes de validaxion')
+      #print(val_mom,strike,bid,ask)
+
+      #print(strike.isnumeric(),bid.isnumeric(),ask.isnumeric())
+      #print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+      #if strike.isnumeric():
+      #  strike=float(strike)
+      #else:
+      #  strike=0
+
+     # if bid.isnumeric():
+      #  bid=float(bid)
+      #else:
+      #  bid=0
+      #if ask.isnumeric():
+      #  ask=float(ask)
+      #else:
+      #  ask=0
+
+      #print(strike)
+      #bid=float(bid)
+      #ask=float(ask)
+      print('fatores formula')
+      print((datas[i+1][0]),"  ",val_mom,strike,bid,ask)
+      #(Valor de Strike - Valor da ação no momento) +
+      #(preço de venda da call no strike - preço de compra da put no strike)/( Valor da ação no momento + preço de compra da put no strike)
+      formula=(strike-val_mom)+(bid-ask)/(val_mom+ask)
+      print(formula)
+      print("=================================================")
+      print(" ")
+
+

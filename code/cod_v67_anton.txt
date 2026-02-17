@@ -1,0 +1,212 @@
+# ============================================
+# CÓDIGO APRIMORADO (versão completa, a partir de #código 22)
+# ============================================
+
+%pip install -q selenium tabulate pandas
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait, Select
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
+from PIL import Image
+from IPython.display import display
+from google.colab import files, drive
+import pandas as pd
+import requests
+import time
+from tabulate import tabulate
+from datetime import datetime
+
+
+# ----------------------------------------------------------
+# CONFIGURAÇÃO DO DRIVER (modo headless)
+# ----------------------------------------------------------
+chrome_options = Options()
+chrome_options.add_argument("--headless")
+chrome_options.add_argument("--no-sandbox")
+chrome_options.add_argument("--disable-dev-shm-usage")
+driver = webdriver.Chrome(options=chrome_options)
+
+
+# ----------------------------------------------------------
+# FUNÇÕES AUXILIARES
+# ----------------------------------------------------------
+
+def ajuste(url2, tiker, val_mom, strike, bid, ask):
+    """Calcula a fórmula customizada."""
+    try:
+        formula = (float(strike) - float(val_mom)) + (float(bid) - float(ask)) / (float(val_mom) + float(ask))
+    except Exception:
+        formula = 0.0
+    return formula
+
+
+def armazem(df):
+    """Salva dataframe em CSV e XLSX e faz download no Colab."""
+    df.to_csv("my_data.csv", index=False)
+    df.to_excel("my_data.xlsx", index=False)
+    files.download("my_data.csv")
+    files.download("my_data.xlsx")
+    return df
+
+
+def cadeiastring(i, datascall, datasput):
+    """Extrai e formata strike, bid e ask de listas de dados call/put."""
+    try:
+        strike = datascall[4] if len(datascall) > 26 else datascall[3]
+        bid = datascall[11] or "0.0"
+        ask = datasput[12] or "0.0"
+        strike = strike.replace(".", "").replace(",", ".")
+        bid = bid.replace(".", "").replace(",", ".")
+        ask = ask.replace(".", "").replace(",", ".")
+        return float(strike), float(bid), float(ask)
+    except Exception:
+        return 0.0, 0.0, 0.0
+
+
+def extradados(table_container):
+    """Extrai dados de uma tabela Selenium, com re-tentativas contra StaleElementReferenceException."""
+    retries = 3
+    for attempt in range(retries):
+        try:
+            rows = table_container.find_elements(By.TAG_NAME, "tr")
+            table_data = [[cell.text for cell in row.find_elements(By.TAG_NAME, "td")] for row in rows]
+            return table_data
+        except StaleElementReferenceException:
+            print(f"Tentando recarregar tabela... ({attempt + 1}/{retries})")
+            time.sleep(1)
+    return []
+
+
+# ----------------------------------------------------------
+# FUNÇÃO PRINCIPAL: PRINP
+# ----------------------------------------------------------
+def prinp(url2):
+    """Extrai dados de um ativo específico e retorna um resumo."""
+    print(f"\n==== Iniciando {url2} ====")
+    url = f"https://opcoes.net.br/opcoes/bovespa/{url2}"
+    driver.get(url)
+
+    # Cotação atual
+    try:
+        table2 = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.ID, "divCotacaoAtual"))
+        )
+        cotiz = table2.text.split()
+        val_mom = float(cotiz[1].replace(".", "").replace(",", "."))
+    except Exception:
+        val_mom = 0.0
+
+    #print(f"Valor atual: {val_mom}")
+
+    # Espera tabela principal
+    try:
+        table_container = WebDriverWait(driver, 15).until(
+            EC.presence_of_element_located((By.ID, "tblListaOpc_wrapper"))
+        )
+    except TimeoutException:
+        print("⚠️ Tabela não carregou.")
+        return pd.DataFrame()
+
+    table_data = extradados(table_container)
+    if not table_data:
+        return pd.DataFrame()
+
+    resumo_list = []
+    for i in range(0, len(table_data), 2):
+        if i + 1 >= len(table_data):
+            break
+        strike, bid, ask = cadeiastring(i, table_data[i], table_data[i + 1])
+        formula = ajuste(url2, table_data[i][0] if table_data[i] else "N/A", val_mom, strike, bid, ask)
+        resumo_list.append({
+            "Ativo": url2,
+            "Ticker": table_data[i][0] if table_data[i] else "N/A",
+            "ValMom": val_mom,
+            "Strike": strike,
+            "Bid": bid,
+            "Ask": ask,
+            "Formula": formula
+        })
+
+    df2 = pd.DataFrame(resumo_list)
+    return df2
+
+
+# ----------------------------------------------------------
+# FUNÇÃO GET_SEL - APRIMORADA CONTRA STALE ELEMENTS
+# ----------------------------------------------------------
+def get_sel(driver, string):
+    all_dataframes = pd.DataFrame()
+    if string=='todo':
+      print("Iniciando coleta de opções disponíveis...")
+
+      #all_dataframes = pd.DataFrame()
+      retries = 3
+
+      for attempt in range(retries):
+         try:
+            select_element = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.NAME, "IdAcao"))
+            )
+            select = Select(select_element)
+            all_options = select.options
+            option_texts = [opt.text.strip() for opt in all_options if len(opt.text.strip()) > 1]
+            print(f"Encontradas {len(option_texts)} opções válidas.")
+            break
+         except (StaleElementReferenceException, TimeoutException):
+              print(f"Tentativa {attempt + 1}/{retries}: seletor recarregando...")
+              time.sleep(2)
+    else:
+        print("❌ Selexionado um ativo.")
+        current_time = datetime.now()
+        print("Current Time:", current_time)
+        driver.get(f"https://opcoes.net.br/opcoes/bovespa/{string}")
+        WebDriverWait(driver, 15).until(
+                    EC.presence_of_element_located((By.ID, "tblListaOpc_wrapper"))
+                )
+        df_temp = prinp(string)
+        all_dataframes = pd.concat([all_dataframes, df_temp], ignore_index=True)
+        return all_dataframes
+
+    for idx, option_text in enumerate(option_texts, start=1):
+        print(f"\n[{idx}/{len(option_texts)}] Processando {option_text}...")
+        for attempt in range(retries):
+            try:
+                current_time = datetime.now()
+                print("Current Time:", current_time)
+                driver.get(f"https://opcoes.net.br/opcoes/bovespa/{option_text}")
+                WebDriverWait(driver, 15).until(
+                    EC.presence_of_element_located((By.ID, "tblListaOpc_wrapper"))
+                )
+                df_temp = prinp(option_text)
+                if not df_temp.empty:
+                    all_dataframes = pd.concat([all_dataframes, df_temp], ignore_index=True)
+                break
+            except (StaleElementReferenceException, TimeoutException):
+                print(f"⚠️ Tentativa {attempt + 1}/{retries} falhou em {option_text}, tentando novamente...")
+                time.sleep(2)
+            except Exception as e:
+                print(f"❌ Erro inesperado com {option_text}: {e}")
+                break
+  
+
+    print("\n✅ Coleta finalizada com sucesso.")
+    print(f"Total de registros obtidos: {len(all_dataframes)}")
+    return all_dataframes
+
+
+# ----------------------------------------------------------
+# EXECUÇÃO
+# ----------------------------------------------------------
+url = "https://opcoes.net.br/opcoes/bovespa/AURE3"
+driver.get(url)
+final_df = get_sel(driver,"todo")
+
+print("\nResumo das 30 melhores (por fórmula):")
+if not final_df.empty and "Formula" in final_df.columns:
+    top30 = final_df.sort_values(by="Formula", ascending=False).head(30)
+    display(top30)
+
+driver.quit()
+

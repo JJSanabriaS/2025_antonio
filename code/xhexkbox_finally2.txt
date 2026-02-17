@@ -1,0 +1,117 @@
+# =========================================
+# STEP 1 — INSTALL DEPENDENCIES
+# =========================================
+!apt-get update -qq
+!apt-get install -qq chromium-chromedriver
+!pip install -q selenium tabulate ipywidgets pillow pandas requests
+
+# =========================================
+# STEP 2 — IMPORTS
+# =========================================
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+from IPython.display import display, clear_output
+import ipywidgets as widgets
+import requests
+import pandas as pd
+
+# =========================================
+# STEP 3 — SELENIUM SETUP
+# =========================================
+chrome_options = Options()
+chrome_options.add_argument("--headless")
+chrome_options.add_argument("--no-sandbox")
+chrome_options.add_argument("--disable-dev-shm-usage")
+chrome_options.add_argument("--window-size=1920,1080")
+
+driver.set_window_size(1920, 1080)  # Full HD size
+driver = webdriver.Chrome(options=chrome_options)
+wait = WebDriverWait(driver, timeout=10)
+
+# =========================================
+# STEP 4 — SCRAPER FUNCTION
+# =========================================
+def prinp():
+    url = "https://opcoes.net.br/opcoes/bovespa/AMBP3"
+    driver.get(url)
+    vencimentos = driver.find_element(By.ID, "grade-vencimentos-dates")
+    # Use WebDriverWait to wait for the checkbox to be clickable
+    # Changed the locator to be more specific if possible, targeting the checkbox within the vencimentos element
+    checkbox = wait.until(EC.presence_of_element_located((By.XPATH, "//div[@id='grade-vencimentos-dates']//input[@type='checkbox']")))
+    print("grade tipo")
+    print(vencimentos.text)
+    ids = driver.find_elements(By.TAG_NAME,"input")
+    vencimentos=[]
+    datas=[]
+    data_du=[]
+    for ii in ids:
+        #print ii.tag_name
+        #print (ii.get_attribute('id'))    # id name as string
+        datas.append(ii.get_attribute('id'))
+        data_du.append(ii.get_attribute('data-du'))
+        #print("label    ",ii.get_attribute('label'))
+        #print("value   ",ii.get_attribute('value'))
+        #print("data-du   ",ii.get_attribute('data-du'))
+        vencimentos.append(ii.get_attribute('selected'))
+
+        #if id_val :
+        #    datas.append(id_val)
+    print(f"✅ Found {len(datas)} vencimentos.")
+    box=len(datas)-5
+    print(datas[0:3])
+    print(vencimentos[0:3])
+    print("labels  ", datas[3:box])
+    datas=datas[3:box]
+    #+data_du[3:box]+"d.u."
+    return datas
+
+datas = prinp()
+
+# =========================================
+# STEP 5 — BUILD DROPDOWN UI
+# =========================================
+dropdown = widgets.Dropdown(
+    options=["todo"] + datas,
+    value="todo",
+    description="Vencimento:",
+    style={'description_width': 'initial'},
+    layout=widgets.Layout(width='60%')
+)
+
+run_button = widgets.Button(
+    description="▶️ Run Action",
+    button_style='success',
+    icon='play',
+    tooltip='Run Selenium action with selected vencimento'
+)
+
+output = widgets.Output()
+
+def on_run_clicked(b):
+    clear_output(wait=True)
+    display(dropdown, run_button, output)
+
+    selected = dropdown.value
+    with output:
+        print(f"🔹 Selected: {selected}")
+        if selected == "todo":
+            print("ℹ️ No specific checkbox selected.")
+        else:
+            url = "https://opcoes.net.br/opcoes/bovespa/AMBP3"
+            driver.get(url)
+            try:
+                checkbox = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, f"#{selected}")))
+                driver.execute_script("arguments[0].click();", checkbox)
+                print(f"✅ Checkbox {selected} clicked successfully!")
+            except Exception as e:
+                print("❌ Error:", e)
+
+run_button.on_click(on_run_clicked)
+
+# =========================================
+# STEP 6 — SHOW INTERFACE
+# =========================================
+display(dropdown, run_button, output)

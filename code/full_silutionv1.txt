@@ -1,0 +1,254 @@
+# =========================================
+# STEP 1 — DEPENDENCIES
+# =========================================
+!apt-get update -qq
+!apt-get install -qq chromium-chromedriver
+!pip install -q selenium tabulate ipywidgets pillow pandas requests
+
+# =========================================
+# STEP 2 — IMPORTS
+# =========================================
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait, Select
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
+from google.colab import files
+import pandas as pd
+import time
+from datetime import datetime
+from IPython.display import display, clear_output
+import ipywidgets as widgets
+
+# =========================================
+# STEP 3 — SELENIUM SETUP
+# =========================================
+chrome_options = Options()
+chrome_options.add_argument("--headless")
+chrome_options.add_argument("--no-sandbox")
+chrome_options.add_argument("--disable-dev-shm-usage")
+chrome_options.add_argument("--window-size=1920,1080")
+
+driver = webdriver.Chrome(options=chrome_options)
+wait = WebDriverWait(driver, timeout=10)
+
+# =========================================
+# STEP 4 — FUNCTIONS
+# =========================================
+def droplistven():
+    """Obtain vencimentos list (labels + values)."""
+    url = "https://opcoes.net.br/opcoes/bovespa/AMBP3"
+    driver.get(url)
+    #wait.until(EC.presence_of_element_located((By.ID, "grade-vencimentos-dates")))
+    vencimentos = driver.find_element(By.ID, "grade-vencimentos-dates")
+    ids = driver.find_elements(By.TAG_NAME, "input")
+    print(vencimentos.text)
+
+    datas, mix = [], []
+    for ii in ids:
+        if ii.get_attribute("data-du"):
+            datas.append(ii.get_attribute("id"))
+            mix.append(f"{ii.get_attribute('id')} - {ii.get_attribute('data-du')} d.u.")
+            print(" venximentos ",f"{ii.get_attribute('id')} - {ii.get_attribute('data-du')} d.u.")
+    
+    
+    vendatas = datas
+    venlabels = mix
+    #print("  venximentos ",vendatas,venlabels)
+    return venlabels, vendatas
+
+def ajuste(url2, tiker, val_mom, strike, bid, ask):
+    try:
+        formula = (float(strike) - float(val_mom)) + (float(bid) - float(ask)) / (float(val_mom) + float(ask))
+    except Exception:
+        formula = 0.0
+    return formula
+
+def armazem(df,name):
+    df.to_csv(name+".csv", index=False)
+    df.to_excel(name+".xlsx", index=False)
+    files.download(name+".csv")
+    files.download(name+".xlsx")
+
+def cadeiastring(i, datascall, datasput):
+    try:
+        strike = datascall[4] if len(datascall) > 26 else datascall[3]
+        bid = datascall[11] or "0.0"
+        ask = datasput[12] or "0.0"
+        strike = strike.replace(".", "").replace(",", ".")
+        bid = bid.replace(".", "").replace(",", ".")
+        ask = ask.replace(".", "").replace(",", ".")
+        return float(strike), float(bid), float(ask)
+    except Exception:
+        return 0.0, 0.0, 0.0
+
+def extradados(table_container):
+    retries = 3
+    for attempt in range(retries):
+        try:
+            rows = table_container.find_elements(By.TAG_NAME, "tr")
+            return [[cell.text for cell in row.find_elements(By.TAG_NAME, "td")] for row in rows]
+        except StaleElementReferenceException:
+            print(f"Reloading table... ({attempt+1}/{retries})")
+            time.sleep(1)
+    return []
+
+def xlixkven(selected_values):
+  try:
+    all_checkboxes = driver.find_elements(By.XPATH, "//div[@id='grade-vencimentos-dates']//input[@type='checkbox']")
+    for cb in all_checkboxes:
+      try:
+        if cb.is_selected():
+          driver.execute_script("arguments[0].click();", cb)
+      except Exception as e:
+            print(f"⚠️ Could not uncheck {cb.get_attribute('id')}: {e}")
+            print("🧹 Cleared all checkboxes.")
+  except Exception as e:
+    print("❌ Error clearing checkboxes:", e)
+
+        # =========================================
+        # 2️⃣ CLICK THE SELECTED CHECKBOXES
+        # =========================================
+  driver.execute_script("window.scrollBy(0, 200);")
+  for val in selected_values:
+    try:
+      checkbox = WebDriverWait(driver, 15).until(EC.element_to_be_clickable((By.ID, val)))
+      driver.execute_script("arguments[0].click();", checkbox)
+      print(f"✅ Clicked checkbox for {options_dict[val]}")
+    except Exception as e:
+      print(f"❌ Error clicking checkbox {val}: {e}")
+
+        # =========================================
+        # 3️⃣ (OPTIONAL) SCREENSHOT CONFIRMATION
+        # =========================================
+    try:
+      driver.save_screenshot("/content/checkbox_click.png")
+      print("📸 Screenshot saved as /content/checkbox_click.png")
+    except Exception as e:
+      print(f"⚠️ Screenshot error: {e}")
+      return 
+
+def prinp(url2):
+    print(f"\n==== Iniciando {url2} ====")
+    driver.get(f"https://opcoes.net.br/opcoes/bovespa/{url2}")
+    try:
+        table2 = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.ID, "divCotacaoAtual"))
+        )
+        cotiz = table2.text.split()
+        val_mom = float(cotiz[1].replace(".", "").replace(",", "."))
+    except Exception:
+        val_mom = 0.0
+
+    try:
+        table_container = WebDriverWait(driver, 15).until(
+            EC.presence_of_element_located((By.ID, "tblListaOpc_wrapper"))
+        )
+    except TimeoutException:
+        print("⚠️ Table not loaded.")
+        return pd.DataFrame()
+
+    table_data = extradados(table_container)
+    if not table_data: return pd.DataFrame()
+
+    resumo_list = []
+    for i in range(3, len(table_data), 2):
+        if i + 1 >= len(table_data): break
+        strike, bid, ask = cadeiastring(i, table_data[i], table_data[i + 1])
+        formula = ajuste(url2, table_data[i][0] if table_data[i] else "N/A", val_mom, strike, bid, ask)
+        resumo_list.append({
+            "Ativo": url2, "Ticker": table_data[i][0] if table_data[i] else "N/A",
+            "ValMom": val_mom, "Strike": strike, "Bid": bid, "Ask": ask, "Formula": formula
+        })
+    return pd.DataFrame(resumo_list)
+
+def get_sel(driver, ativo,vendata):
+    all_dataframes = pd.DataFrame()
+    if ativo == "todo":
+        select = Select(WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.NAME, "IdAcao"))))
+        all_options = [opt.text.strip() for opt in select.options if len(opt.text.strip()) > 1]
+    else:
+        all_options = [ativo]
+
+    for idx, option_text in enumerate(all_options, start=1):
+        print(f"\n[{idx}/{len(all_options)}] Processando {option_text}...")
+        try:
+            xlixkven(vendata)
+            df_temp = prinp(option_text)
+            if not df_temp.empty:
+                all_dataframes = pd.concat([all_dataframes, df_temp], ignore_index=True)
+        except Exception as e:
+            print(f"❌ Erro: {e}")
+    return all_dataframes
+
+# =========================================
+# STEP 5 — USER INTERFACE
+# =========================================
+ativos_dropdown = widgets.Dropdown(description="Ativos:")
+vencimentos_multi = widgets.SelectMultiple(description="Vencimentos:")
+threshold_input = widgets.FloatText(value=-0.05, description="User Threshold:")
+populate_btn = widgets.Button(description="1️⃣ Populate", button_style='info')
+run_btn = widgets.Button(description="2️⃣ Run Scraper", button_style='success', layout=widgets.Layout(display='none'))
+save_btn = widgets.Button(description="3️⃣ Save Results", button_style='warning', layout=widgets.Layout(display='none'))
+
+out = widgets.Output()
+display(populate_btn, ativos_dropdown, vencimentos_multi, threshold_input, run_btn, save_btn, out)
+
+venlabels, vendatas = [], []
+final_df, top30 = pd.DataFrame(), pd.DataFrame()
+
+def populate_click(b):
+    with out:
+        clear_output()
+        print("⏳ Populating options...")
+        try:
+            driver.get("https://opcoes.net.br/opcoes/bovespa/AURE3")
+            select = Select(WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.NAME, "IdAcao"))))
+            ativos = ["todo"] + [opt.text.strip() for opt in select.options if len(opt.text.strip()) > 1]
+            ativos_dropdown.options = ativos
+            global venlabels, vendatas
+            venlabels, vendatas = droplistven()
+            vencimentos_multi.options = venlabels
+            print("✅ Populate complete!")
+            run_btn.layout.display = ''
+        except Exception as e:
+            print("❌ Error populating:", e)
+
+def run_click(b):
+    with out:
+        clear_output()
+        ativo = ativos_dropdown.value
+        selected_labels = vencimentos_multi.value
+        selected_values = [vendatas[venlabels.index(l)] for l in selected_labels]
+        print(f"▶️ Running scraper for: {ativo}")
+        print(f"📆 Selected vencimentos: {selected_labels}")
+        print(f"⚙️ Corresponding values: {selected_values}")
+        print(f"Threshold: {threshold_input.value}")
+        df = get_sel(driver, ativo,selected_values)
+        if not df.empty:
+            df["MinBidAsk"] = df[["Bid", "Ask"]].min(axis=1)
+            df = df[df["MinBidAsk"] >= threshold_input.value]
+            global final_df, top30
+            final_df = df
+            top30 = df.sort_values(by="Formula", ascending=False).head(30)
+            print("✅ Data obtained successfully.")
+            display(top30)
+            save_btn.layout.display = ''
+        else:
+            print("⚠️ No data obtained.")
+
+def save_click(b):
+    with out:
+        clear_output()
+        if final_df.empty:
+            print("⚠️ No data to save.")
+            return
+        armazem(final_df, "resumo")
+        armazem(top30, "top30")
+        print("💾 Saved resumo and top30 successfully!")
+
+populate_btn.on_click(populate_click)
+run_btn.on_click(run_click)
+save_btn.on_click(save_click)
+

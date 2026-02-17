@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Bovespa Scraper</title>
+</head>
+<body>
+<h1>Bovespa Scraper</h1>
+<form method="POST">
+    <label for="ativo">Escolha o ativo:</label>
+    <select name="ativo">
+        {% for ativo in ativos %}
+            <option value="{{ ativo }}">{{ ativo }}</option>
+        {% endfor %}
+    </select>
+    <button type="submit">Scrape</button>
+</form>
+
+{% if message %}
+<p>{{ message }}</p>
+<p>
+    <a href="/download/resumo">Download full CSV</a><br>
+    <a href="/download/top30">Download top30 CSV</a>
+</p>
+{% endif %}
+</body>
+</html>
+
