@@ -83,6 +83,12 @@ One particular website for brazilian stock market updated with dynamic content u
 
 ---
 
+## Development time
+
+  Aprox five months
+  two people time (one finance and other AI/TI  focus)
+---
+
 |   |  |
 |---|--|
 |output |![database sample ](/code/imagens/output.png)| 
